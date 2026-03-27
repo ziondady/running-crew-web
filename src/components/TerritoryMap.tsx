@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { getCachedLocation, saveLocation } from "@/lib/location";
 
 interface TerritoryItem {
   id: number;
@@ -38,7 +39,9 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
     const map = L.map(containerRef.current, {
       zoomControl: false,
       attributionControl: false,
-    }).setView([37.5665, 126.9780], 12); // Default: Seoul
+    });
+    const cached = getCachedLocation();
+    map.setView(cached ? [cached.lat, cached.lng] : [37.5665, 126.9780], cached ? 14 : 12);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
@@ -56,7 +59,7 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
         btn.onclick = (e) => {
           e.stopPropagation();
           navigator.geolocation?.getCurrentPosition(
-            (pos) => { if (mapRef.current) mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 15); },
+            (pos) => { saveLocation(pos.coords.latitude, pos.coords.longitude); if (mapRef.current) mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 15); },
             () => {}, { enableHighAccuracy: true }
           );
         };
@@ -71,7 +74,10 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
     // Try current location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => { if (mapRef.current) mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 14); },
+        (pos) => {
+          saveLocation(pos.coords.latitude, pos.coords.longitude);
+          if (mapRef.current) mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 14);
+        },
         () => {},
         { enableHighAccuracy: true }
       );

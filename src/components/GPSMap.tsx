@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { getCachedLocation, saveLocation } from "@/lib/location";
 
 interface GpsPoint {
   lat: number;
@@ -27,7 +28,9 @@ export default function GPSMap({ points, currentPos }: GPSMapProps) {
     const map = L.map(containerRef.current, {
       zoomControl: false,
       attributionControl: false,
-    }).setView([37.5665, 126.9780], 15); // Default: Seoul
+    });
+    const cached = getCachedLocation();
+    map.setView(cached ? [cached.lat, cached.lng] : [37.5665, 126.9780], cached ? 16 : 15);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
@@ -46,7 +49,7 @@ export default function GPSMap({ points, currentPos }: GPSMapProps) {
         btn.onclick = (e) => {
           e.stopPropagation();
           navigator.geolocation?.getCurrentPosition(
-            (pos) => { if (mapRef.current) mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 16); },
+            (pos) => { saveLocation(pos.coords.latitude, pos.coords.longitude); if (mapRef.current) mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 16); },
             () => {}, { enableHighAccuracy: true }
           );
         };
@@ -61,6 +64,7 @@ export default function GPSMap({ points, currentPos }: GPSMapProps) {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
+          saveLocation(pos.coords.latitude, pos.coords.longitude);
           if (mapRef.current) {
             mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 16);
           }
