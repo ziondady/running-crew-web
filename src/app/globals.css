@@ -1,26 +1,77 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --primary: #FF5722;
+  --primary-light: #FF8A65;
+  --dark: #1A1A2E;
+  --accent: #FFC107;
+  --bg: #F0F2F5;
+  --card: #ffffff;
+  --muted: #888;
+  --border: #E0E0E0;
+  --op: #1565C0;
+  --opl: #42A5F5;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-primary: #FF5722;
+  --color-primary-light: #FF8A65;
+  --color-dark: #1A1A2E;
+  --color-accent: #FFC107;
+  --color-muted: #888888;
+  --color-op: #1565C0;
+  --color-opl: #42A5F5;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: #222;
+  font-family: -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* Battle animations */
+@keyframes cardSlideIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes runnerBounce {
+  0% { transform: translateY(0) rotate(-5deg); }
+  100% { transform: translateY(-6px) rotate(5deg); }
+}
+@keyframes vsBounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+@keyframes dDayPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes fireFloat {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-20px) scale(0.5); }
+}
+@keyframes kmPop {
+  0% { opacity: 0; transform: scale(0.5); }
+  60% { transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes rankSlide {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes arrowBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes progressGrow {
+  from { width: 0%; }
+}
+@keyframes confettiFall {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-8px) rotate(10deg); }
+  75% { transform: translateY(-4px) rotate(-10deg); }
 }

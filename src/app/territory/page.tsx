@@ -1,0 +1,345 @@
+"use client";
+import { useState, useEffect } from "react";
+import AppShell from "@/components/AppShell";
+import TopBar from "@/components/TopBar";
+import { getTerritories, getTerritoryRanking, getTerritoryLogs } from "@/lib/api";
+import { getStoredUser, AuthUser } from "@/lib/auth";
+
+interface TerritoryItem {
+  id: number;
+  user: number;
+  username: string;
+  user_color: string;
+  path_data: { lat: number; lng: number }[];
+  durability: number;
+  last_run_at: string;
+}
+
+interface RankItem {
+  crew_id: number;
+  crew_name: string;
+  segments: number;
+  rank: number;
+}
+
+interface LogItem {
+  id: number;
+  username: string;
+  action: string;
+  durability: number;
+  created_at: string;
+}
+
+function durabilityOpacity(d: number) {
+  return 0.2 + d * 0.16;
+}
+
+function durabilityWidth(d: number) {
+  return 1.5 + d * 0.7;
+}
+
+// GPS 좌표를 SVG 0~100 범위로 변환
+function gpsToSvg(territories: TerritoryItem[]) {
+  const allPoints = territories.flatMap((t) => t.path_data);
+  if (allPoints.length === 0) return { lines: [], bounds: null };
+
+  const lats = allPoints.map((p) => p.lat);
+  const lngs = allPoints.map((p) => p.lng);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+  const padLat = (maxLat - minLat) * 0.1 || 0.001;
+  const padLng = (maxLng - minLng) * 0.1 || 0.001;
+
+  const toX = (lng: number) => ((lng - minLng + padLng) / (maxLng - minLng + padLng * 2)) * 100;
+  const toY = (lat: number) => 100 - ((lat - minLat + padLat) / (maxLat - minLat + padLat * 2)) * 100;
+
+  const lines = territories.map((t) => ({
+    ...t,
+    svgPath: t.path_data.map((p, i) => `${i === 0 ? "M" : "L"} ${toX(p.lng).toFixed(1)} ${toY(p.lat).toFixed(1)}`).join(" "),
+  }));
+
+  return { lines, bounds: { minLat, maxLat, minLng, maxLng } };
+}
+
+export default function TerritoryPage() {
+  const [tab, setTab] = useState<"map" | "detail" | "alert">("map");
+  const [territories, setTerritories] = useState<TerritoryItem[]>([]);
+  const [myTerritories, setMyTerritories] = useState<TerritoryItem[]>([]);
+  const [ranking, setRanking] = useState<RankItem[]>([]);
+  const [logs, setLogs] = useState<LogItem[]>([]);
+  const [me, setMe] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activityLogLimit, setActivityLogLimit] = useState(10);
+
+  useEffect(() => {
+    const stored = getStoredUser();
+    if (stored) setMe(stored);
+
+    Promise.all([
+      getTerritories().catch(() => []),
+      getTerritoryRanking().catch(() => []),
+      getTerritoryLogs(stored?.id).catch(() => []),
+    ]).then(([allT, rank, logData]) => {
+      const tList = Array.isArray(allT) ? allT : allT.results ?? [];
+      setTerritories(tList);
+      setMyTerritories(tList.filter((t: TerritoryItem) => t.user === stored?.id));
+      setRanking(Array.isArray(rank) ? rank : rank.results ?? []);
+      setLogs(logData);
+      setLoading(false);
+    });
+  }, []);
+
+  const { lines } = gpsToSvg(territories);
+  const mySegments = myTerritories.length;
+  const myRankEntry = ranking.find((r) => r.crew_id === me?.crew);
+
+  // 내구도 분포
+  const durDist = [5, 4, 3, 2, 1].map((lv) => ({
+    lv,
+    count: myTerritories.filter((t) => t.durability === lv).length,
+  }));
+  const durColors: Record<number, string> = { 5: "#1B5E20", 4: "#2E7D32", 3: "#43A047", 2: "#66BB6A", 1: "#A5D6A7" };
+
+  // 자연감소 예정 (7일 기준)
+  const now = Date.now();
+  const decayWarnings = myTerritories
+    .map((t) => {
+      const lastRun = new Date(t.last_run_at).getTime();
+      const daysSince = Math.floor((now - lastRun) / 86400000);
+      const daysUntilDecay = 7 - daysSince;
+      if (daysUntilDecay <= 7 && daysUntilDecay > 0) {
+        return { id: t.id, durability: t.durability, daysLeft: daysUntilDecay };
+      }
+      return null;
+    })
+    .filter(Boolean) as { id: number; durability: number; daysLeft: number }[];
+
+  // 유저별 색상 범례
+  const owners = [...new Map(territories.map((t) => [t.username, t.user_color])).entries()];
+
+  const actionLabels: Record<string, { label: string; color: string; border: string }> = {
+    claim: { label: "🎉 새 구간 점령!", color: "text-green-600", border: "border-green-500" },
+    reinforce: { label: "🏰 크루 내구도 강화", color: "text-blue-600", border: "border-blue-500" },
+    takeover: { label: "⚔️ 크루 점령지 탈환당함!", color: "text-red-500", border: "border-red-500" },
+    decay: { label: "📉 내구도 감소", color: "text-orange-600", border: "border-orange-400" },
+  };
+
+  return (
+    <AppShell>
+      <TopBar title="🗺️ 점령전" settingsButton />
+      <div className="p-3">
+        <div className="flex gap-1 mb-3">
+          {([["map", "전체 지도"], ["detail", "점령전 현황"], ["alert", "알림"]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`flex-1 text-center py-2 rounded-lg text-xs font-bold ${
+                tab === key ? "bg-green-600 text-white" : "bg-gray-200 text-gray-400"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {loading && <div className="text-center text-gray-400 text-sm py-8">로딩 중...</div>}
+
+        {!loading && tab === "map" && (
+          <>
+            <div className="relative bg-gray-100 rounded-xl overflow-hidden" style={{ height: 320 }}>
+              {/* Grid */}
+              <svg className="absolute inset-0 w-full h-full opacity-10">
+                {[20, 40, 60, 80].map((v) => (
+                  <g key={v}>
+                    <line x1={`${v}%`} y1="0" x2={`${v}%`} y2="100%" stroke="#333" strokeWidth="0.5" />
+                    <line x1="0" y1={`${v}%`} x2="100%" y2={`${v}%`} stroke="#333" strokeWidth="0.5" />
+                  </g>
+                ))}
+              </svg>
+
+              {/* Territory lines from API */}
+              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                {lines.map((line) => (
+                  <path
+                    key={line.id}
+                    d={line.svgPath}
+                    fill="none"
+                    stroke={line.user_color}
+                    strokeWidth={durabilityWidth(line.durability)}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    opacity={durabilityOpacity(line.durability)}
+                  />
+                ))}
+              </svg>
+
+              {territories.length === 0 && (
+                <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
+                  아직 점령 데이터가 없습니다
+                </div>
+              )}
+
+              {/* Legend */}
+              {owners.length > 0 && (
+                <div className="absolute bottom-2 left-2 bg-white/90 rounded-lg px-2 py-1.5 text-[10px] space-y-1">
+                  {owners.map(([name, color]) => (
+                    <div key={name} className="flex items-center gap-1.5">
+                      <div className="w-5 h-1 rounded" style={{ backgroundColor: color }} />
+                      <span>{name === me?.username ? `나 (${name})` : name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Durability legend */}
+              <div className="absolute bottom-2 right-2 bg-white/90 rounded-lg px-2 py-1.5 text-[10px]">
+                <div className="text-gray-500 font-bold mb-0.5">내구도</div>
+                {[1, 3, 5].map((lv) => (
+                  <div key={lv} className="flex items-center gap-1.5">
+                    <div className="w-5 rounded" style={{ backgroundColor: me?.profile_color || "#FF5722", opacity: durabilityOpacity(lv), height: durabilityWidth(lv) }} />
+                    <span>Lv.{lv}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="flex gap-2 mt-3">
+              <div className="flex-1 bg-orange-50 rounded-lg p-3 text-center">
+                <div className="text-lg font-extrabold text-[var(--primary)]">{mySegments}구간</div>
+                <div className="text-[10px] text-gray-400">점령 구간</div>
+              </div>
+              <div className="flex-1 bg-green-50 rounded-lg p-3 text-center">
+                <div className="text-lg font-extrabold text-green-600">{territories.length}개</div>
+                <div className="text-[10px] text-gray-400">전체 구간</div>
+              </div>
+              <div className="flex-1 bg-blue-50 rounded-lg p-3 text-center">
+                <div className="text-lg font-extrabold text-[var(--op)]">{myRankEntry?.rank || "-"}위</div>
+                <div className="text-[10px] text-gray-400">전체 랭킹</div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {!loading && tab === "detail" && (
+          <>
+            {/* 점령전 현황 헤더 */}
+            <div className="rounded-xl p-4 text-white mb-3" style={{ background: "linear-gradient(135deg, #2E7D32, #4CAF50)" }}>
+              <div className="text-sm font-bold">{me?.crew_name || "내 크루"}</div>
+              <div className="text-xs opacity-80 mt-1">크루원이 달린 길이 점령됩니다</div>
+              <div className="grid grid-cols-3 gap-2 mt-3">
+                <div className="text-center">
+                  <div className="text-xl font-extrabold">{mySegments}</div>
+                  <div className="text-[9px] opacity-80">점령 구간</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xl font-extrabold">{myRankEntry?.rank || "-"}</div>
+                  <div className="text-[9px] opacity-80">전체 크루 순위</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-xl font-extrabold">{durDist.find((d) => d.lv === 5)?.count || 0}</div>
+                  <div className="text-[9px] opacity-80">Lv.5 요새</div>
+                </div>
+              </div>
+            </div>
+
+            {/* 내구도 분포 — 쉬운 설명 추가 */}
+            <div className="bg-white rounded-xl p-4 shadow-sm mb-3">
+              <h3 className="text-sm font-bold text-green-700 mb-1">🏰 구간별 내구도</h3>
+              <p className="text-[10px] text-gray-400 mb-3">내구도가 높을수록 다른 크루가 빼앗기 어렵습니다</p>
+              {mySegments === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-2">크루원이 GPS로 달리면 점령이 시작됩니다</p>
+              ) : (
+                durDist.map((item) => (
+                  <div key={item.lv} className="flex items-center gap-2 py-1">
+                    <span className="text-xs font-bold w-8">Lv.{item.lv}</span>
+                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${mySegments > 0 ? (item.count / mySegments) * 100 : 0}%`, backgroundColor: durColors[item.lv] }} />
+                    </div>
+                    <span className="text-xs font-semibold w-10 text-right">{item.count}구간</span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* 자연감소 경고 */}
+            {decayWarnings.length > 0 && (
+              <div className="bg-white rounded-xl p-4 shadow-sm mb-3">
+                <h3 className="text-sm font-bold text-orange-700 mb-1">⚠️ 내구도 감소 예정</h3>
+                <p className="text-[10px] text-gray-400 mb-3">방문하지 않은 구간은 7일마다 내구도가 1씩 감소합니다</p>
+                {decayWarnings.map((w) => (
+                  <div key={w.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-b-0">
+                    <span className="text-xs">구간 #{w.id}</span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
+                      {w.daysLeft}일 후 Lv.{w.durability}→{w.durability - 1 === 0 ? "소멸" : w.durability - 1}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 점령 활동 이력 */}
+            <div className="bg-white rounded-xl p-4 shadow-sm mb-3">
+              <h3 className="text-sm font-bold text-gray-700 mb-1">📋 점령 활동 이력</h3>
+              {logs.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-2">활동 이력이 없습니다</p>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    {logs.slice(0, activityLogLimit).map((log) => {
+                      const style = actionLabels[log.action] || actionLabels.claim;
+                      const timeAgo = Math.floor((now - new Date(log.created_at).getTime()) / 3600000);
+                      return (
+                        <div key={log.id} className={`rounded-lg p-3 border-l-4 ${style.border} bg-gray-50`}>
+                          <div className="flex justify-between items-center">
+                            <span className={`text-xs font-extrabold ${style.color}`}>{style.label}</span>
+                            <span className="text-[10px] text-gray-400">{timeAgo < 1 ? "방금" : `${timeAgo}시간 전`}</span>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1">
+                            <strong>{log.username}</strong> — Lv.{log.durability}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {logs.length > activityLogLimit && (
+                    <button
+                      onClick={() => setActivityLogLimit((prev) => prev + 10)}
+                      className="w-full mt-3 py-2 text-xs font-bold text-gray-500 bg-gray-100 rounded-lg active:scale-95 transition-transform"
+                    >
+                      더보기
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        )}
+
+        {!loading && tab === "alert" && (
+          <div className="space-y-2">
+            {logs.length === 0 ? (
+              <div className="text-center text-gray-400 text-sm py-8">알림이 없습니다</div>
+            ) : (
+              logs.map((log) => {
+                const style = actionLabels[log.action] || actionLabels.claim;
+                const timeAgo = Math.floor((now - new Date(log.created_at).getTime()) / 3600000);
+                return (
+                  <div key={log.id} className={`bg-white rounded-xl p-3 shadow-sm border-l-4 ${style.border}`}>
+                    <div className="flex justify-between items-center">
+                      <span className={`text-xs font-extrabold ${style.color}`}>{style.label}</span>
+                      <span className="text-[10px] text-gray-400">{timeAgo < 1 ? "방금" : `${timeAgo}시간 전`}</span>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">
+                      <strong>{log.username}</strong> — Lv.{log.durability}
+                    </p>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+    </AppShell>
+  );
+}
