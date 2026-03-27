@@ -33,7 +33,7 @@ export async function createRunLog(data: {
 }
 
 // Auth
-export async function register(data: { username: string; email: string; password: string }) {
+export async function register(data: { username: string; nickname: string; email: string; password: string }) {
   return postAPI('/accounts/register/', data);
 }
 
@@ -43,6 +43,16 @@ export async function login(data: { username: string; password: string }) {
 
 export async function getUserProfile(userId: number) {
   return fetchAPI(`/accounts/profile/${userId}/`);
+}
+
+export async function updateNickname(userId: number, nickname: string) {
+  const res = await fetch(`${API_BASE}/accounts/profile/${userId}/nickname/`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ nickname }),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
 }
 
 // Accounts

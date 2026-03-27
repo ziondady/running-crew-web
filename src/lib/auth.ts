@@ -1,6 +1,8 @@
 export interface AuthUser {
   id: number;
   username: string;
+  nickname: string;
+  display_name: string;
   email: string;
   role: string;
   crew: number | null;

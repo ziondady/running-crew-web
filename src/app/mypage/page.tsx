@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
-import { getUserProfile, API_BASE } from "@/lib/api";
+import { getUserProfile, updateNickname, API_BASE } from "@/lib/api";
 import { getStoredUser, saveUser, clearUser, AuthUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
 
@@ -11,13 +11,15 @@ export default function MyPage() {
   const router = useRouter();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editingNickname, setEditingNickname] = useState(false);
+  const [nicknameInput, setNicknameInput] = useState("");
 
   useEffect(() => {
     const stored = getStoredUser();
     if (!stored) { router.replace("/"); return; }
 
     getUserProfile(stored.id)
-      .then((data) => { setUser(data); setLoading(false); })
+      .then((data) => { setUser(data); saveUser(data); setLoading(false); })
       .catch(() => { setUser(stored); setLoading(false); });
   }, [router]);
 
@@ -32,14 +34,12 @@ export default function MyPage() {
     if (!confirm("크루를 탈퇴하면 팀전/대항전 참여가 중단됩니다.\n정말 탈퇴하시겠습니까?")) return;
 
     try {
-      // user의 crew를 null로 설정
       const res = await fetch(`${API_BASE}/accounts/users/${user.id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ crew: null, role: "member" }),
       });
       if (!res.ok) throw new Error("탈퇴 실패");
-      const updated = await res.json();
       saveUser({ ...user, crew: null, crew_name: null, role: "member" });
       alert("크루에서 탈퇴했습니다.");
       router.push("/home");
@@ -48,11 +48,29 @@ export default function MyPage() {
     }
   };
 
+  const handleNicknameEdit = () => {
+    setNicknameInput(user?.nickname || "");
+    setEditingNickname(true);
+  };
+
+  const handleNicknameSave = async () => {
+    if (!user || !nicknameInput.trim()) return;
+    try {
+      const updated = await updateNickname(user.id, nicknameInput.trim());
+      setUser(updated);
+      saveUser(updated);
+      setEditingNickname(false);
+    } catch {
+      alert("닉네임 변경에 실패했습니다.");
+    }
+  };
+
   if (loading || !user) return null;
 
   const isOperator = user.role === "operator";
 
   const menuItems = [
+    { icon: "✏️", label: "닉네임 변경", action: true, onClick: handleNicknameEdit },
     ...(user.crew ? [{ icon: "🚪", label: "크루 탈퇴", action: true, danger: true, onClick: handleLeaveCrew }] : []),
     { icon: "🟢", label: "Strava 연결", tag: "미연결", tagColor: "gray" },
     { icon: "⌚", label: "Garmin 연결", tag: "미연결", tagColor: "gray" },
@@ -82,7 +100,8 @@ export default function MyPage() {
           >
             🏃
           </div>
-          <h2 className="font-extrabold text-lg">{user.username}</h2>
+          <h2 className="font-extrabold text-lg">{user.display_name || user.nickname || user.username}</h2>
+          <div className="text-[10px] text-gray-300">@{user.username}</div>
           <div className="flex items-center justify-center gap-2 mt-0.5">
             <span className="text-xs text-gray-400">{user.crew_name || "크루 미소속"}</span>
             {isOperator && (
@@ -108,6 +127,25 @@ export default function MyPage() {
             </div>
           </div>
         </div>
+
+        {/* 닉네임 변경 모달 */}
+        {editingNickname && (
+          <div className="bg-white rounded-xl p-4 shadow-sm">
+            <p className="text-sm font-bold mb-2">닉네임 변경</p>
+            <input
+              type="text"
+              value={nicknameInput}
+              onChange={(e) => setNicknameInput(e.target.value)}
+              maxLength={30}
+              placeholder="새 닉네임"
+              className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm outline-none focus:border-[var(--primary)]"
+            />
+            <div className="flex gap-2 mt-2">
+              <button onClick={() => setEditingNickname(false)} className="flex-1 py-2 text-sm text-gray-500 bg-gray-100 rounded-lg">취소</button>
+              <button onClick={handleNicknameSave} className="flex-1 py-2 text-sm text-white bg-[var(--primary)] rounded-lg font-bold">저장</button>
+            </div>
+          </div>
+        )}
 
         {/* Menu */}
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">

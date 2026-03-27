@@ -8,6 +8,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
+  const [nickname, setNickname] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -36,6 +37,10 @@ export default function LoginPage() {
       setError("아이디와 비밀번호를 입력해주세요");
       return;
     }
+    if (mode === "register" && !nickname) {
+      setError("닉네임을 입력해주세요");
+      return;
+    }
     if (mode === "register" && !email) {
       setError("이메일을 입력해주세요");
       return;
@@ -44,7 +49,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const res = mode === "register"
-        ? await register({ username, email, password })
+        ? await register({ username, nickname, email, password })
         : await login({ username, password });
 
       saveUser(res.user);
@@ -109,6 +114,17 @@ export default function LoginPage() {
           onChange={(e) => setUsername(e.target.value)}
           className="w-full bg-white/10 border border-white/20 rounded-xl py-3 px-4 text-white text-sm outline-none placeholder:text-gray-500 focus:border-[var(--primary)]"
         />
+
+        {/* Nickname (register only) */}
+        {mode === "register" && (
+          <input
+            type="text"
+            placeholder="닉네임 (화면에 표시되는 이름)"
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+            className="w-full bg-white/10 border border-white/20 rounded-xl py-3 px-4 text-white text-sm outline-none placeholder:text-gray-500 focus:border-[var(--primary)]"
+          />
+        )}
 
         {/* Email (register only) */}
         {mode === "register" && (
