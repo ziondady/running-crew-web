@@ -1,9 +1,10 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
 import CrewRanking from "@/components/CrewRanking";
-import { getDailyRanking, getCrewRanking } from "@/lib/api";
+import { getDailyRanking, getCrewRanking, getUserDailyLogs, getUserMonthlyLogs } from "@/lib/api";
 import { getStoredUser, saveUser, AuthUser } from "@/lib/auth";
 import { getUserProfile } from "@/lib/api";
 import { fmtKm } from "@/lib/format";
@@ -16,12 +17,23 @@ interface RankItem {
   username: string;
   km: number;
   rank: number;
+  manual_km?: number;
+  gps_km?: number;
   team?: { team_side: string; team_label: string; battle_name: string };
 }
 
 export default function RankingPage() {
-  const [mainTab, setMainTab] = useState<MainTab>("crewRank");
-  const [distanceSubTab, setDistanceSubTab] = useState<DistanceSubTab>("daily");
+  return (
+    <Suspense fallback={<div className="text-center text-gray-400 py-8">로딩 중...</div>}>
+      <RankingContent />
+    </Suspense>
+  );
+}
+
+function RankingContent() {
+  const searchParams = useSearchParams();
+  const [mainTab, setMainTab] = useState<MainTab>((searchParams.get("tab") as MainTab) || "crewRank");
+  const [distanceSubTab, setDistanceSubTab] = useState<DistanceSubTab>((searchParams.get("sub") as DistanceSubTab) || "daily");
 
   const [me, setMe] = useState<AuthUser | null>(null);
   const [error, setError] = useState("");
@@ -29,6 +41,9 @@ export default function RankingPage() {
   const [ranking, setRanking] = useState<RankItem[]>([]);
   const [rankingLoading, setRankingLoading] = useState(false);
   const [teamTotals, setTeamTotals] = useState<Record<string, number> | null>(null);
+  const [expandedUserId, setExpandedUserId] = useState<number | null>(null);
+  const [detailLogs, setDetailLogs] = useState<any[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const today = new Date();
   const [selectedDate, setSelectedDate] = useState(today.toISOString().slice(0, 10));
@@ -57,7 +72,7 @@ export default function RankingPage() {
       } else if (subTab === "monthly" && user.crew) {
         const data = await getCrewRanking(user.crew, year, month);
         if (data.ranking) {
-          setRanking(data.ranking.map((r: any) => ({ ...r, km: r.monthly_km, team: r.team })));
+          setRanking(data.ranking.map((r: any) => ({ ...r, km: r.monthly_km, team: r.team, manual_km: r.manual_km, gps_km: r.gps_km })));
           setTeamTotals(data.team_totals);
         } else {
           const arr = Array.isArray(data) ? data : [];
@@ -82,9 +97,17 @@ export default function RankingPage() {
       .then((data) => {
         setMe(data);
         saveUser(data);
+        if (searchParams.get("tab") === "distance") {
+          const sub = (searchParams.get("sub") as DistanceSubTab) || "daily";
+          fetchDistanceRanking(sub, data, selectedDate, selectedYear, selectedMonth);
+        }
       })
       .catch(() => {
         setMe(stored);
+        if (searchParams.get("tab") === "distance" && stored) {
+          const sub = (searchParams.get("sub") as DistanceSubTab) || "daily";
+          fetchDistanceRanking(sub, stored, selectedDate, selectedYear, selectedMonth);
+        }
       });
   }, []);
 
@@ -104,6 +127,23 @@ export default function RankingPage() {
         fetchDistanceRanking("monthly", me, undefined, selectedYear, selectedMonth);
       }
     }
+  };
+
+  const handleRowClick = async (userId: number) => {
+    if (expandedUserId === userId) {
+      setExpandedUserId(null);
+      setDetailLogs([]);
+      return;
+    }
+    setExpandedUserId(userId);
+    setDetailLoading(true);
+    try {
+      const logs = distanceSubTab === "daily"
+        ? await getUserDailyLogs(userId, selectedDate)
+        : await getUserMonthlyLogs(userId, selectedYear, selectedMonth);
+      setDetailLogs(logs);
+    } catch { setDetailLogs([]); }
+    setDetailLoading(false);
   };
 
   const top3 = ranking.slice(0, 3);
@@ -243,32 +283,36 @@ export default function RankingPage() {
               <div className="text-center text-gray-400 text-sm py-8">아직 기록이 없습니다</div>
             ) : (
               <>
-                {top3.length >= 3 && (
+                {top3.length >= 1 && (
                   <div className="flex items-end justify-center gap-2 mb-4">
-                    <div className="text-center w-[72px]">
-                      <div className="text-2xl">🥈</div>
-                      <div className="bg-gray-300 rounded-t-lg h-12 flex items-center justify-center">
-                        <div className="text-[10px] font-bold text-gray-700 leading-tight">
-                          {top3[1]?.username}<br />{fmtKm(top3[1]?.km)}km
+                    {top3[1] && (
+                      <div className="text-center w-[72px]">
+                        <div className="text-2xl">🥈</div>
+                        <div className="bg-gray-300 rounded-t-lg h-12 flex items-center justify-center">
+                          <div className="text-[10px] font-bold text-gray-700 leading-tight">
+                            {top3[1].username}<br />{fmtKm(top3[1].km)}km
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                     <div className="text-center w-[80px]">
                       <div className="text-3xl">🥇</div>
                       <div className="bg-yellow-400 rounded-t-lg h-16 flex items-center justify-center">
                         <div className="text-[10px] font-bold text-gray-700 leading-tight">
-                          {top3[0]?.username}<br />{fmtKm(top3[0]?.km)}km
+                          {top3[0].username}<br />{fmtKm(top3[0].km)}km
                         </div>
                       </div>
                     </div>
-                    <div className="text-center w-[72px]">
-                      <div className="text-2xl">🥉</div>
-                      <div className="rounded-t-lg h-9 flex items-center justify-center" style={{ backgroundColor: "#CD7F32" }}>
-                        <div className="text-[10px] font-bold text-white leading-tight">
-                          {top3[2]?.username}<br />{fmtKm(top3[2]?.km)}km
+                    {top3[2] && (
+                      <div className="text-center w-[72px]">
+                        <div className="text-2xl">🥉</div>
+                        <div className="rounded-t-lg h-9 flex items-center justify-center" style={{ backgroundColor: "#CD7F32" }}>
+                          <div className="text-[10px] font-bold text-white leading-tight">
+                            {top3[2].username}<br />{fmtKm(top3[2].km)}km
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 )}
 
@@ -288,20 +332,65 @@ export default function RankingPage() {
                 <div className="space-y-1.5">
                   {ranking.map((r) => {
                     const isMe = me && r.id === me.id;
+                    const isExpanded = expandedUserId === r.id;
+                    const currentDate = distanceSubTab === "daily" ? selectedDate : `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
                     return (
-                      <div key={r.id} className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm shadow-sm ${isMe ? "bg-orange-50 border border-orange-200" : "bg-white"}`}>
-                        <span className="font-extrabold text-[var(--primary)] w-5">{r.rank}</span>
-                        {r.team && (
-                          <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
-                            r.team.team_side === "A" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-600"
-                          }`}>
-                            {r.team.team_label}
+                      <div key={r.id}>
+                        <div
+                          onClick={() => handleRowClick(r.id)}
+                          className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm shadow-sm cursor-pointer active:scale-[0.98] transition-transform ${isMe ? "bg-orange-50 border border-orange-200" : "bg-white"} ${isExpanded ? "rounded-b-none" : ""}`}
+                        >
+                          <span className="font-extrabold text-[var(--primary)] w-5">{r.rank}</span>
+                          {r.team && (
+                            <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
+                              r.team.team_side === "A" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-600"
+                            }`}>
+                              {r.team.team_label}
+                            </span>
+                          )}
+                          <span className={`flex-1 font-semibold ${isMe ? "text-[var(--primary)]" : ""}`}>
+                            {isMe ? `나 (${r.username})` : r.username}
                           </span>
+                          <div className="text-right">
+                            <span className={`font-bold ${isMe ? "text-[var(--primary)]" : "text-[var(--dark)]"}`}>{fmtKm(r.km)}km</span>
+                            {(r.manual_km !== undefined && r.gps_km !== undefined && (r.manual_km > 0 || r.gps_km > 0)) && (
+                              <div className="text-[9px] text-gray-400 leading-tight mt-0.5">
+                                {r.gps_km > 0 && <span>GPS {fmtKm(r.gps_km)}</span>}
+                                {r.gps_km > 0 && r.manual_km > 0 && <span> · </span>}
+                                {r.manual_km > 0 && <span>수동 {fmtKm(r.manual_km)}</span>}
+                              </div>
+                            )}
+                          </div>
+                          <span className={`text-[10px] text-gray-300 transition-transform ${isExpanded ? "rotate-180" : ""}`}>▼</span>
+                        </div>
+                        {isExpanded && (
+                          <div className={`rounded-b-lg px-3 py-2 border-t ${isMe ? "bg-orange-50/50 border-orange-200" : "bg-gray-50 border-gray-100"}`}>
+                            {detailLoading ? (
+                              <div className="text-[10px] text-gray-400 text-center py-2">로딩 중...</div>
+                            ) : detailLogs.length === 0 ? (
+                              <div className="text-[10px] text-gray-400 text-center py-2">기록 없음</div>
+                            ) : (
+                              <div className="space-y-1">
+                                {detailLogs.map((log: any) => (
+                                  <div key={log.id} className="flex items-center gap-2 text-[11px]">
+                                    <span className="text-gray-400 shrink-0">{distanceSubTab === "monthly" && log.date ? `${log.date.slice(5)} ` : ""}{log.created_at}</span>
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                      log.source_key === 'manual' ? 'bg-yellow-100 text-yellow-700' :
+                                      log.source_key === 'gps' ? 'bg-green-100 text-green-700' :
+                                      'bg-blue-100 text-blue-700'
+                                    }`}>{log.source}</span>
+                                    <span className="flex-1 text-gray-500">
+                                      {log.distance !== log.buff_distance
+                                        ? `${fmtKm(log.distance)}km → ${fmtKm(log.buff_distance)}km`
+                                        : `${fmtKm(log.buff_distance)}km`}
+                                    </span>
+                                    {log.is_offline_meetup && <span className="text-[9px]">🏃오프벙</span>}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         )}
-                        <span className={`flex-1 font-semibold ${isMe ? "text-[var(--primary)]" : ""}`}>
-                          {isMe ? `나 (${r.username})` : r.username}
-                        </span>
-                        <span className={`font-bold ${isMe ? "text-[var(--primary)]" : "text-[var(--dark)]"}`}>{fmtKm(r.km)}km</span>
                       </div>
                     );
                   })}

@@ -13,6 +13,8 @@ interface TerritoryItem {
   user: number;
   username: string;
   user_color: string;
+  crew_id: number | null;
+  crew_name: string | null;
   path_data: { lat: number; lng: number }[];
   durability: number;
   last_run_at: string;
@@ -116,16 +118,35 @@ export default function TerritoryPage() {
         {!loading && tab === "map" && (
           <>
             {/* Leaflet Map */}
-            <TerritoryMap territories={territories} myUserId={me?.id} />
+            <TerritoryMap territories={territories} myUserId={me?.id} myCrewId={me?.crew} />
 
             {/* Legend */}
-            <div className="flex gap-2 mt-2">
-              <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                <div className="w-6 h-1 rounded bg-[var(--primary)]" /> 내 크루
-              </div>
-              <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                <div className="w-6 h-0.5 rounded bg-gray-300" /> 다른 크루
-              </div>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+              {(() => {
+                const crewSet = new Map<number, string>();
+                territories.forEach(t => {
+                  if (t.crew_id && t.crew_name && !crewSet.has(t.crew_id)) {
+                    crewSet.set(t.crew_id, t.crew_name);
+                  }
+                });
+                const COLORS = ["#FF5722","#1565C0","#2E7D32","#9C27B0","#F57C00","#00838F","#C62828","#4527A0"];
+                const entries = [...crewSet.entries()];
+                // Sort so my crew is first
+                entries.sort((a, b) => (a[0] === me?.crew ? -1 : b[0] === me?.crew ? 1 : 0));
+                let idx = 0;
+                const colorMap: Record<number, string> = {};
+                if (me?.crew) colorMap[me.crew] = COLORS[0];
+                idx = 1;
+                entries.forEach(([cid]) => {
+                  if (!colorMap[cid]) { colorMap[cid] = COLORS[idx % COLORS.length]; idx++; }
+                });
+                return entries.map(([cid, name]) => (
+                  <div key={cid} className="flex items-center gap-1 text-[10px] text-gray-500">
+                    <div className="w-5 h-1 rounded" style={{ backgroundColor: colorMap[cid] }} />
+                    {name}{cid === me?.crew ? " (나)" : ""}
+                  </div>
+                ));
+              })()}
               <div className="flex items-center gap-1 text-[10px] text-gray-500">
                 선 굵기 = 내구도
               </div>

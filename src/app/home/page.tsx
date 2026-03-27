@@ -158,7 +158,7 @@ export default function HomePage() {
         {/* Crew ranking */}
         {me.crew && (
         <div>
-          <p className="text-xs font-bold mb-2">크루 랭킹 ({me.crew_name})</p>
+          <p className="text-xs font-bold mb-2 cursor-pointer active:opacity-70" onClick={() => router.push("/ranking?tab=distance&sub=monthly")}>크루내 개인랭킹 ({me.crew_name}) <span className="text-gray-400">→</span></p>
           {loading ? (
             <div className="text-center text-gray-400 text-sm py-4">로딩 중...</div>
           ) : ranking.length === 0 ? (

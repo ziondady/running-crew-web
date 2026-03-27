@@ -119,7 +119,7 @@ export default function InputPage() {
         <div className={`rounded-lg px-3 py-1.5 text-xs font-bold text-center mb-3 ${
           useApi ? "bg-green-50 text-green-600" : "bg-yellow-50 text-yellow-600"
         }`}>
-          {useApi ? "📝 수동입력은 점령전에 반영되지 않습니다" : "⚠️ API 미연결"}
+          {useApi ? "📝 수동입력은 점령전과 대항전에는 반영되지 않습니다" : "⚠️ API 미연결"}
         </div>
 
         {/* Date */}

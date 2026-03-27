@@ -8,6 +8,8 @@ interface TerritoryItem {
   user: number;
   username: string;
   user_color: string;
+  crew_id: number | null;
+  crew_name: string | null;
   path_data: { lat: number; lng: number }[];
   durability: number;
 }
@@ -15,9 +17,16 @@ interface TerritoryItem {
 interface TerritoryMapProps {
   territories: TerritoryItem[];
   myUserId?: number;
+  myCrewId?: number | null;
 }
 
-export default function TerritoryMap({ territories, myUserId }: TerritoryMapProps) {
+const CREW_COLORS = [
+  "#FF5722", "#1565C0", "#2E7D32", "#9C27B0", "#F57C00",
+  "#00838F", "#C62828", "#4527A0", "#EF6C00", "#00695C",
+  "#AD1457", "#283593", "#558B2F", "#6A1B9A", "#D84315",
+];
+
+export default function TerritoryMap({ territories, myUserId, myCrewId }: TerritoryMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const layersRef = useRef<L.LayerGroup | null>(null);
@@ -37,13 +46,32 @@ export default function TerritoryMap({ territories, myUserId }: TerritoryMapProp
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
 
+    // 현위치 이동 버튼
+    const locateControl = L.Control.extend({
+      options: { position: "bottomright" as L.ControlPosition },
+      onAdd() {
+        const btn = L.DomUtil.create("div", "");
+        btn.innerHTML = "📍";
+        btn.style.cssText = "width:34px;height:34px;background:#fff;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;margin-bottom:0;";
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          navigator.geolocation?.getCurrentPosition(
+            (pos) => { if (mapRef.current) mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 15); },
+            () => {}, { enableHighAccuracy: true }
+          );
+        };
+        return btn;
+      },
+    });
+    new locateControl().addTo(map);
+
     layersRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 
     // Try current location
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 14),
+        (pos) => { if (mapRef.current) mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 14); },
         () => {},
         { enableHighAccuracy: true }
       );
@@ -65,18 +93,33 @@ export default function TerritoryMap({ territories, myUserId }: TerritoryMapProp
 
     const allPoints: [number, number][] = [];
 
+    // Build crew color map
+    const crewIds = [...new Set(territories.map(t => t.crew_id).filter(Boolean))] as number[];
+    const crewColorMap: Record<number, string> = {};
+    // My crew always gets index 0 (primary color)
+    if (myCrewId) {
+      crewColorMap[myCrewId] = CREW_COLORS[0];
+    }
+    let colorIdx = 1;
+    crewIds.forEach(cid => {
+      if (!crewColorMap[cid]) {
+        crewColorMap[cid] = CREW_COLORS[colorIdx % CREW_COLORS.length];
+        colorIdx++;
+      }
+    });
+
     territories.forEach((t) => {
       if (!t.path_data || t.path_data.length < 2) return;
 
       const latLngs: [number, number][] = t.path_data.map((p) => [p.lat, p.lng]);
       allPoints.push(...latLngs);
 
-      const isMine = t.user === myUserId;
-      const color = t.user_color || (isMine ? "#FF5722" : "#1565C0");
+      const isMyCrew = t.crew_id === myCrewId;
+      const color = t.crew_id ? (crewColorMap[t.crew_id] || "#999") : "#999";
 
       // Line weight based on durability (1-5)
-      const weight = 2 + t.durability * 1.5; // 3.5 ~ 9.5
-      const opacity = 0.4 + t.durability * 0.12; // 0.52 ~ 1.0
+      const weight = 2 + t.durability * 1.5;
+      const opacity = 0.4 + t.durability * 0.12;
 
       const polyline = L.polyline(latLngs, {
         color: color,
@@ -91,8 +134,9 @@ export default function TerritoryMap({ territories, myUserId }: TerritoryMapProp
       polyline.bindPopup(`
         <div style="font-size:12px;min-width:120px;">
           <strong>${t.username}</strong><br/>
-          내구도: Lv.${t.durability}<br/>
-          ${isMine ? '<span style="color:#FF5722;font-weight:bold;">내 크루</span>' : ''}
+          ${t.crew_name ? `<span style="color:${color};font-weight:bold;">${t.crew_name}</span><br/>` : ''}
+          내구도: Lv.${t.durability}
+          ${isMyCrew ? '<br/><span style="color:#FF5722;font-size:10px;">내 크루</span>' : ''}
         </div>
       `);
 
@@ -104,9 +148,9 @@ export default function TerritoryMap({ territories, myUserId }: TerritoryMapProp
       const bounds = L.latLngBounds(allPoints);
       mapRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
     }
-  }, [territories, myUserId]);
+  }, [territories, myUserId, myCrewId]);
 
   return (
-    <div ref={containerRef} className="w-full rounded-xl overflow-hidden" style={{ height: "350px", background: "#e8e8e8" }} />
+    <div ref={containerRef} className="w-full rounded-xl overflow-hidden" style={{ height: "55vh", background: "#e8e8e8" }} />
   );
 }

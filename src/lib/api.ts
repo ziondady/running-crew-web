@@ -99,11 +99,19 @@ export async function getDailyRanking(crewId?: number, date?: string) {
   return fetchAPI(`/running/logs/daily_ranking/${query}`);
 }
 
+export async function getUserDailyLogs(userId: number, date: string) {
+  return fetchAPI(`/running/logs/user-daily-logs/?user_id=${userId}&date=${date}`);
+}
+
+export async function getUserMonthlyLogs(userId: number, year: number, month: number) {
+  return fetchAPI(`/running/logs/user-daily-logs/?user_id=${userId}&year=${year}&month=${month}`);
+}
+
 // Territory
 export async function getTerritories(userId?: number) {
-  const query = userId ? `?user=${userId}` : '';
+  const query = userId ? `?user=${userId}` : '?all=true';
   const data = await fetchAPI(`/territory/territories/${query}`);
-  return data.results;
+  return Array.isArray(data) ? data : data.results;
 }
 
 export async function getTerritoryRanking() {

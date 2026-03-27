@@ -53,6 +53,8 @@ interface CrewBattleHistory {
   battle_type: string;
   crew_a_name: string | null;
   crew_b_name: string | null;
+  crew_a_km?: number;
+  crew_b_km?: number;
   winner_name: string | null;
   result: "win" | "loss" | "draw";
   start_date: string;
@@ -249,6 +251,11 @@ export default function VersusPage() {
                     <div className="flex-1">
                       <div className="text-sm font-semibold">{h.crew_a_name} vs {h.crew_b_name}</div>
                       <div className="text-[10px] text-gray-400">{h.start_date} ~ {h.end_date}</div>
+                      {(h.crew_a_km !== undefined && h.crew_b_km !== undefined) && (
+                        <div className="text-[11px] font-bold text-gray-500 mt-0.5">
+                          {h.crew_a_km}km vs {h.crew_b_km}km
+                        </div>
+                      )}
                     </div>
                     {h.winner_name && (
                       <div className="text-[10px] font-bold text-green-600">{h.winner_name} 승</div>

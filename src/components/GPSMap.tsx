@@ -36,13 +36,34 @@ export default function GPSMap({ points, currentPos }: GPSMapProps) {
     // Add zoom control to bottom right
     L.control.zoom({ position: "bottomright" }).addTo(map);
 
+    // 현위치 이동 버튼
+    const locateControl = L.Control.extend({
+      options: { position: "bottomright" as L.ControlPosition },
+      onAdd() {
+        const btn = L.DomUtil.create("div", "");
+        btn.innerHTML = "📍";
+        btn.style.cssText = "width:34px;height:34px;background:#fff;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;margin-bottom:0;";
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          navigator.geolocation?.getCurrentPosition(
+            (pos) => { if (mapRef.current) mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 16); },
+            () => {}, { enableHighAccuracy: true }
+          );
+        };
+        return btn;
+      },
+    });
+    new locateControl().addTo(map);
+
     mapRef.current = map;
 
     // Try to get initial position
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          map.setView([pos.coords.latitude, pos.coords.longitude], 16);
+          if (mapRef.current) {
+            mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 16);
+          }
         },
         () => {},
         { enableHighAccuracy: true }
