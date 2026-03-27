@@ -1,12 +1,11 @@
 "use client";
-import { useEffect, useState } from "react";
+import { API_BASE } from "@/lib/api";import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
 import { getStoredUser, AuthUser } from "@/lib/auth";
 
-const API_BASE = "http://localhost:8000/api";
 
 export default function OperatorQR() {
   const router = useRouter();

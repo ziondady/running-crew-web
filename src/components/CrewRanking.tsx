@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { API_BASE } from "@/lib/api";import { useEffect, useState } from "react";
 
 interface CrewRankItem {
   id: number;
@@ -19,7 +19,6 @@ interface ScoreLog {
   date: string;
 }
 
-const API_BASE = "http://localhost:8000/api";
 
 export default function CrewRanking({ myCrewId }: { myCrewId?: number | null }) {
   const [ranking, setRanking] = useState<CrewRankItem[]>([]);

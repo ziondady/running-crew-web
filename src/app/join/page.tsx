@@ -1,9 +1,8 @@
 "use client";
-import { Suspense, useEffect, useState } from "react";
+import { API_BASE } from "@/lib/api";import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getStoredUser, saveUser, AuthUser } from "@/lib/auth";
 
-const API_BASE = "http://localhost:8000/api";
 
 export default function JoinPage() {
   return (

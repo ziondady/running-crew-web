@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
 import BattleCard from "@/components/BattleCard";
-import { getUserProfile } from "@/lib/api";
+import { getUserProfile, API_BASE } from "@/lib/api";
 import { getStoredUser, saveUser, AuthUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
 
@@ -82,14 +82,14 @@ export default function VersusPage() {
     if (battles.length > 0) return;
     setBattlesLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/crews/battles/my-active/?user_id=${user.id}`, { cache: "no-store" });
+      const res = await fetch(`${API_BASE}/crews/battles/my-active/?user_id=${user.id}`, { cache: "no-store" });
       const data: ActiveBattle[] = await res.json();
       setBattles(data);
       const details: Record<number, TeamDetail> = {};
       for (const b of data) {
         if (b.battle_type === "internal") {
           try {
-            const r = await fetch(`http://localhost:8000/api/crews/battle-teams/by-battle/?battle=${b.battle_id}`, { cache: "no-store" });
+            const r = await fetch(`${API_BASE}/crews/battle-teams/by-battle/?battle=${b.battle_id}`, { cache: "no-store" });
             details[b.battle_id] = await r.json();
           } catch {}
         }
@@ -104,7 +104,7 @@ export default function VersusPage() {
     setPastInternalLoading(true);
     try {
       const res = await fetch(
-        `http://localhost:8000/api/crews/battles/?crew_a=${user.crew}&battle_type=internal`,
+        `${API_BASE}/crews/battles/?crew_a=${user.crew}&battle_type=internal`,
         { cache: "no-store" }
       );
       const data = await res.json();
@@ -119,7 +119,7 @@ export default function VersusPage() {
     if (!user.crew) return;
     setCrewBattleHistoryLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/crews/battles/crew-history/?crew_id=${user.crew}`, { cache: "no-store" });
+      const res = await fetch(`${API_BASE}/crews/battles/crew-history/?crew_id=${user.crew}`, { cache: "no-store" });
       const data = await res.json();
       const all: CrewBattleHistory[] = Array.isArray(data) ? data : data.results ?? [];
       setCrewBattleHistory(all.slice(0, 10));

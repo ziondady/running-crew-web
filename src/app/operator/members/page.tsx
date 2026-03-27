@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { API_BASE } from "@/lib/api";import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
@@ -15,7 +15,6 @@ interface Member {
   profile_color: string;
 }
 
-const API_BASE = "http://localhost:8000/api";
 
 const ROLES = [
   { value: "member", label: "일반 멤버" },

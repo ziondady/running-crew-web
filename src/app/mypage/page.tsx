@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
-import { getUserProfile } from "@/lib/api";
+import { getUserProfile, API_BASE } from "@/lib/api";
 import { getStoredUser, saveUser, clearUser, AuthUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
 
@@ -33,7 +33,7 @@ export default function MyPage() {
 
     try {
       // user의 crew를 null로 설정
-      const res = await fetch(`http://localhost:8000/api/accounts/users/${user.id}/`, {
+      const res = await fetch(`${API_BASE}/accounts/users/${user.id}/`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ crew: null, role: "member" }),

@@ -1,11 +1,10 @@
 "use client";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { API_BASE } from "@/lib/api";import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getStoredUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
 
-const API_BASE = "http://localhost:8000/api";
 
 // Dynamic import for Leaflet (SSR 불가)
 const MapView = dynamic(() => import("@/components/GPSMap"), { ssr: false });
@@ -48,11 +47,21 @@ export default function GPSPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
 
   const watchIdRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
   const pausedTimeRef = useRef<number>(0);
+  const lastGpsTimeRef = useRef<number>(0);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToast(msg);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+  }, []);
 
   const addPoint = useCallback((lat: number, lng: number) => {
     const now = Date.now();
@@ -84,9 +93,27 @@ export default function GPSPage() {
       setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
     }, 1000);
 
+    // GPS 신호 체크 타이머 (10초간 GPS 못 잡으면 경고)
+    const gpsCheckInterval = setInterval(() => {
+      if (lastGpsTimeRef.current > 0) {
+        const gap = Date.now() - lastGpsTimeRef.current;
+        if (gap > 10000) {
+          showToast("📡 GPS 신호를 찾는 중...");
+        }
+      }
+    }, 3000);
+
     // GPS watch
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
+        const accuracy = pos.coords.accuracy;
+        setGpsAccuracy(Math.round(accuracy));
+        lastGpsTimeRef.current = Date.now();
+
+        if (accuracy > 50) {
+          showToast(`📡 GPS 정확도 낮음 (${Math.round(accuracy)}m)`);
+          return; // 50m 초과 시 무시
+        }
         addPoint(pos.coords.latitude, pos.coords.longitude);
       },
       (err) => {
@@ -94,12 +121,19 @@ export default function GPSPage() {
           setPermissionDenied(true);
           setError("GPS 권한이 거부되었습니다. 브라우저 설정에서 위치 권한을 허용해주세요.");
           stopTracking();
-        } else {
-          setError(`GPS 오류: ${err.message}`);
+        } else if (err.code === 2) {
+          showToast("📡 GPS를 찾을 수 없습니다. 실외로 이동해주세요");
+        } else if (err.code === 3) {
+          showToast("📡 GPS 응답 시간 초과. 재시도 중...");
         }
       },
-      { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
     );
+
+    // cleanup에 gpsCheck도 포함
+    const origCleanup = () => clearInterval(gpsCheckInterval);
+    const prevWatch = watchIdRef.current;
+    watchIdRef.current = Object.assign(prevWatch, { _gpsCheck: gpsCheckInterval }) as any;
   };
 
   const pauseTracking = () => {
@@ -184,10 +218,31 @@ export default function GPSPage() {
   const currentPos = points.length > 0 ? points[points.length - 1] : null;
 
   return (
-    <div className="max-w-[430px] w-full mx-auto min-h-screen bg-[#1a2a3a] flex flex-col">
-      {/* Map */}
-      <div className="relative" style={{ height: "55vh" }}>
+    <div className="max-w-[430px] w-full mx-auto h-screen bg-[#1a2a3a] flex flex-col overflow-hidden">
+      {/* Map - fills remaining space */}
+      <div className="flex-1 relative">
         <MapView points={points} currentPos={currentPos} />
+
+        {/* Toast popup */}
+        {toast && (
+          <div
+            className="absolute top-16 left-4 right-4 z-[1000] bg-black/80 text-white text-xs font-bold text-center py-3 px-4 rounded-xl"
+            style={{ animation: "cardSlideIn 0.3s ease-out" }}
+          >
+            {toast}
+          </div>
+        )}
+
+        {/* GPS accuracy indicator */}
+        {status === "running" && gpsAccuracy !== null && (
+          <div className={`absolute top-4 left-16 z-[1000] text-[10px] font-bold px-2 py-1 rounded-full ${
+            gpsAccuracy <= 10 ? "bg-green-500 text-white" :
+            gpsAccuracy <= 30 ? "bg-yellow-500 text-white" :
+            "bg-red-500 text-white"
+          }`}>
+            📡 {gpsAccuracy}m
+          </div>
+        )}
 
         {/* Back button */}
         <button
@@ -209,7 +264,7 @@ export default function GPSPage() {
       </div>
 
       {/* Stats panel */}
-      <div className="bg-[#111] p-4">
+      <div className="bg-[#111] p-4 flex-shrink-0">
         {/* Main stat */}
         <div className="text-center mb-3">
           <div className="text-4xl font-black text-white" style={{ animation: status === "running" ? "kmPop 0.3s ease-out" : "none" }}>

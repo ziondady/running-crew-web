@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import BattleCard from "@/components/BattleCard";
-import { getCrewRanking, getUserProfile } from "@/lib/api";
+import { getCrewRanking, getUserProfile ,API_BASE} from "@/lib/api";
 import { getStoredUser, saveUser, AuthUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
 
@@ -48,7 +48,7 @@ export default function HomePage() {
         saveUser(data);
         // 유저의 크루 ID로 랭킹 조회
         // 활성 팀전 조회
-        fetch(`http://localhost:8000/api/crews/battles/my-active/?user_id=${data.id}`, { cache: "no-store" })
+        fetch(`${API_BASE}/crews/battles/my-active/?user_id=${data.id}`, { cache: "no-store" })
           .then((r) => r.json())
           .then((battles) => setActiveBattles(battles))
           .catch(() => {});

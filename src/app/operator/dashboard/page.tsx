@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { API_BASE } from "@/lib/api";import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
@@ -27,7 +27,6 @@ interface CrewStats {
 type SortKey = "monthly_km" | "monthly_meetup" | "username";
 type SortDir = "asc" | "desc";
 
-const API_BASE = "http://localhost:8000/api";
 
 export default function OperatorDashboard() {
   const router = useRouter();

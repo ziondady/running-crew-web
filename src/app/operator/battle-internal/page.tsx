@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { API_BASE } from "@/lib/api";import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
@@ -12,7 +12,6 @@ interface Member {
   monthly_km: number;
 }
 
-const API_BASE = "http://localhost:8000/api";
 
 type AssignMode = "random" | "manual";
 

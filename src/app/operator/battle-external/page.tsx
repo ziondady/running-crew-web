@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { API_BASE } from "@/lib/api";import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
@@ -12,7 +12,6 @@ interface Crew {
   member_count?: number;
 }
 
-const API_BASE = "http://localhost:8000/api";
 
 export default function OperatorBattleExternal() {
   const router = useRouter();

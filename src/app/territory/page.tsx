@@ -1,9 +1,12 @@
 "use client";
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
 import { getTerritories, getTerritoryRanking, getTerritoryLogs } from "@/lib/api";
 import { getStoredUser, AuthUser } from "@/lib/auth";
+
+const TerritoryMap = dynamic(() => import("@/components/TerritoryMap"), { ssr: false });
 
 interface TerritoryItem {
   id: number;
@@ -30,36 +33,6 @@ interface LogItem {
   created_at: string;
 }
 
-function durabilityOpacity(d: number) {
-  return 0.2 + d * 0.16;
-}
-
-function durabilityWidth(d: number) {
-  return 1.5 + d * 0.7;
-}
-
-// GPS 좌표를 SVG 0~100 범위로 변환
-function gpsToSvg(territories: TerritoryItem[]) {
-  const allPoints = territories.flatMap((t) => t.path_data);
-  if (allPoints.length === 0) return { lines: [], bounds: null };
-
-  const lats = allPoints.map((p) => p.lat);
-  const lngs = allPoints.map((p) => p.lng);
-  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-  const padLat = (maxLat - minLat) * 0.1 || 0.001;
-  const padLng = (maxLng - minLng) * 0.1 || 0.001;
-
-  const toX = (lng: number) => ((lng - minLng + padLng) / (maxLng - minLng + padLng * 2)) * 100;
-  const toY = (lat: number) => 100 - ((lat - minLat + padLat) / (maxLat - minLat + padLat * 2)) * 100;
-
-  const lines = territories.map((t) => ({
-    ...t,
-    svgPath: t.path_data.map((p, i) => `${i === 0 ? "M" : "L"} ${toX(p.lng).toFixed(1)} ${toY(p.lat).toFixed(1)}`).join(" "),
-  }));
-
-  return { lines, bounds: { minLat, maxLat, minLng, maxLng } };
-}
 
 export default function TerritoryPage() {
   const [tab, setTab] = useState<"map" | "detail" | "alert">("map");
@@ -89,7 +62,6 @@ export default function TerritoryPage() {
     });
   }, []);
 
-  const { lines } = gpsToSvg(territories);
   const mySegments = myTerritories.length;
   const myRankEntry = ranking.find((r) => r.crew_id === me?.crew);
 
@@ -113,9 +85,6 @@ export default function TerritoryPage() {
       return null;
     })
     .filter(Boolean) as { id: number; durability: number; daysLeft: number }[];
-
-  // 유저별 색상 범례
-  const owners = [...new Map(territories.map((t) => [t.username, t.user_color])).entries()];
 
   const actionLabels: Record<string, { label: string; color: string; border: string }> = {
     claim: { label: "🎉 새 구간 점령!", color: "text-green-600", border: "border-green-500" },
@@ -146,60 +115,19 @@ export default function TerritoryPage() {
 
         {!loading && tab === "map" && (
           <>
-            <div className="relative bg-gray-100 rounded-xl overflow-hidden" style={{ height: 320 }}>
-              {/* Grid */}
-              <svg className="absolute inset-0 w-full h-full opacity-10">
-                {[20, 40, 60, 80].map((v) => (
-                  <g key={v}>
-                    <line x1={`${v}%`} y1="0" x2={`${v}%`} y2="100%" stroke="#333" strokeWidth="0.5" />
-                    <line x1="0" y1={`${v}%`} x2="100%" y2={`${v}%`} stroke="#333" strokeWidth="0.5" />
-                  </g>
-                ))}
-              </svg>
+            {/* Leaflet Map */}
+            <TerritoryMap territories={territories} myUserId={me?.id} />
 
-              {/* Territory lines from API */}
-              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                {lines.map((line) => (
-                  <path
-                    key={line.id}
-                    d={line.svgPath}
-                    fill="none"
-                    stroke={line.user_color}
-                    strokeWidth={durabilityWidth(line.durability)}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    opacity={durabilityOpacity(line.durability)}
-                  />
-                ))}
-              </svg>
-
-              {territories.length === 0 && (
-                <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
-                  아직 점령 데이터가 없습니다
-                </div>
-              )}
-
-              {/* Legend */}
-              {owners.length > 0 && (
-                <div className="absolute bottom-2 left-2 bg-white/90 rounded-lg px-2 py-1.5 text-[10px] space-y-1">
-                  {owners.map(([name, color]) => (
-                    <div key={name} className="flex items-center gap-1.5">
-                      <div className="w-5 h-1 rounded" style={{ backgroundColor: color }} />
-                      <span>{name === me?.username ? `나 (${name})` : name}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Durability legend */}
-              <div className="absolute bottom-2 right-2 bg-white/90 rounded-lg px-2 py-1.5 text-[10px]">
-                <div className="text-gray-500 font-bold mb-0.5">내구도</div>
-                {[1, 3, 5].map((lv) => (
-                  <div key={lv} className="flex items-center gap-1.5">
-                    <div className="w-5 rounded" style={{ backgroundColor: me?.profile_color || "#FF5722", opacity: durabilityOpacity(lv), height: durabilityWidth(lv) }} />
-                    <span>Lv.{lv}</span>
-                  </div>
-                ))}
+            {/* Legend */}
+            <div className="flex gap-2 mt-2">
+              <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                <div className="w-6 h-1 rounded bg-[var(--primary)]" /> 내 크루
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                <div className="w-6 h-0.5 rounded bg-gray-300" /> 다른 크루
+              </div>
+              <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                선 굵기 = 내구도
               </div>
             </div>
 

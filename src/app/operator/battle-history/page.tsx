@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { API_BASE } from "@/lib/api";import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
@@ -17,7 +17,6 @@ interface Battle {
   end_date: string;
 }
 
-const API_BASE = "http://localhost:8000/api";
 
 export default function BattleHistoryPage() {
   const router = useRouter();

@@ -1,12 +1,11 @@
 "use client";
-import { useState, useRef } from "react";
+import { API_BASE } from "@/lib/api";import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
 import { getStoredUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
 
-const API_BASE = "http://localhost:8000/api";
 
 interface UploadResult {
   filename: string;

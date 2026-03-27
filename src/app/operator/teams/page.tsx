@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useEffect, useState } from "react";
+import { API_BASE } from "@/lib/api";import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
@@ -19,7 +19,6 @@ interface Battle {
   crew_a_name?: string;
 }
 
-const API_BASE = "http://localhost:8000/api";
 
 export default function OperatorTeamsPage() {
   return (
