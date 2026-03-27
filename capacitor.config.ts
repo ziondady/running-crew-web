@@ -7,6 +7,10 @@ const config: CapacitorConfig = {
   server: {
     url: 'https://run4u.fit',
     cleartext: false,
+    androidScheme: 'https',
+  },
+  android: {
+    allowMixedContent: true,
   },
   plugins: {
     PushNotifications: {
