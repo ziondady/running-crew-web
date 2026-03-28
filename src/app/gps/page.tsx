@@ -223,7 +223,23 @@ export default function GPSPage() {
   const currentPos = points.length > 0 ? points[points.length - 1] : null;
 
   return (
-    <div className="max-w-[430px] w-full mx-auto h-screen bg-[#1a2a3a] flex flex-col overflow-hidden">
+    <div className="max-w-[430px] w-full mx-auto h-screen bg-[#1a2a3a] flex flex-col overflow-hidden relative">
+      {/* 화면잠금 오버레이 - full screen */}
+      {locked && (
+        <div
+          className="absolute inset-0 z-[2000] flex items-center justify-center bg-black/70"
+          onDoubleClick={() => setLocked(false)}
+        >
+          <div className="text-center">
+            <div className="text-4xl mb-3">🔒</div>
+            <div className="text-white text-sm font-bold">화면이 잠겨있습니다</div>
+            <div className="text-gray-400 text-xs mt-1">두 번 터치하면 잠금 해제</div>
+            <div className="text-white text-2xl font-black mt-4">{fmtKm(distance)} km</div>
+            <div className="text-gray-400 text-xs mt-1">{formatTime(elapsed)}</div>
+          </div>
+        </div>
+      )}
+
       {/* Map - fills remaining space */}
       <div className="flex-1 relative">
         <MapView points={points} currentPos={currentPos} />
@@ -277,21 +293,6 @@ export default function GPSPage() {
           </>
         )}
 
-        {/* 화면잠금 오버레이 */}
-        {locked && (
-          <div
-            className="absolute inset-0 z-[2000] flex items-center justify-center bg-black/70"
-            onDoubleClick={() => setLocked(false)}
-          >
-            <div className="text-center">
-              <div className="text-4xl mb-3">🔒</div>
-              <div className="text-white text-sm font-bold">화면이 잠겨있습니다</div>
-              <div className="text-gray-400 text-xs mt-1">두 번 터치하면 잠금 해제</div>
-              <div className="text-white text-2xl font-black mt-4">{fmtKm(distance)} km</div>
-              <div className="text-gray-400 text-xs mt-1">{formatTime(elapsed)}</div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Stats panel */}
