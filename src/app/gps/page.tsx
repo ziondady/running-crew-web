@@ -262,17 +262,19 @@ export default function GPSPage() {
 
         {/* Status badge + Lock button */}
         {status === "running" && (
-          <div className="absolute top-4 right-4 z-[1000] flex gap-2">
+          <>
+            <div className="absolute top-4 right-4 z-[1000]">
+              <div className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full" style={{ animation: "dDayPulse 2s ease-in-out infinite" }}>
+                ● REC
+              </div>
+            </div>
             <button
               onClick={() => setLocked(true)}
-              className="bg-black/50 text-white text-xs font-bold px-3 py-1 rounded-full"
+              className="absolute bottom-3 left-3 z-[1000] bg-red-500 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-1.5 text-sm active:scale-95 transition-transform"
             >
-              🔒
+              🔒 화면잠금
             </button>
-            <div className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full" style={{ animation: "dDayPulse 2s ease-in-out infinite" }}>
-              ● REC
-            </div>
-          </div>
+          </>
         )}
 
         {/* 화면잠금 오버레이 */}
