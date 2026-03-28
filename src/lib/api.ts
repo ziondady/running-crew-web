@@ -45,6 +45,20 @@ export async function getUserProfile(userId: number) {
   return fetchAPI(`/accounts/profile/${userId}/`);
 }
 
+export async function getNotifySettings(userId: number) {
+  return fetchAPI(`/accounts/profile/${userId}/notify-settings/`);
+}
+
+export async function updateNotifySettings(userId: number, settings: Record<string, boolean>) {
+  const res = await fetch(`${API_BASE}/accounts/profile/${userId}/notify-settings/`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
 export async function updateNickname(userId: number, nickname: string) {
   const res = await fetch(`${API_BASE}/accounts/profile/${userId}/nickname/`, {
     method: 'PUT',

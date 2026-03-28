@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
-import { getUserProfile, updateNickname, API_BASE } from "@/lib/api";
+import { getUserProfile, updateNickname, getNotifySettings, updateNotifySettings, API_BASE } from "@/lib/api";
 import { getStoredUser, saveUser, clearUser, AuthUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
 
@@ -13,6 +13,10 @@ export default function MyPage() {
   const [loading, setLoading] = useState(true);
   const [editingNickname, setEditingNickname] = useState(false);
   const [nicknameInput, setNicknameInput] = useState("");
+  const [showNotifySettings, setShowNotifySettings] = useState(false);
+  const [notifySettings, setNotifySettings] = useState({
+    notify_battle: true, notify_territory: true, notify_crew: true, notify_ranking: true,
+  });
 
   useEffect(() => {
     const stored = getStoredUser();
@@ -65,6 +69,27 @@ export default function MyPage() {
     }
   };
 
+  const handleOpenNotifySettings = async () => {
+    if (!user) return;
+    try {
+      const data = await getNotifySettings(user.id);
+      setNotifySettings(data);
+    } catch {}
+    setShowNotifySettings(true);
+  };
+
+  const handleToggleNotify = async (key: string) => {
+    if (!user) return;
+    const newVal = !notifySettings[key as keyof typeof notifySettings];
+    const updated = { ...notifySettings, [key]: newVal };
+    setNotifySettings(updated);
+    try {
+      await updateNotifySettings(user.id, { [key]: newVal });
+    } catch {
+      setNotifySettings({ ...notifySettings });
+    }
+  };
+
   if (loading || !user) return null;
 
   const isOperator = user.role === "operator";
@@ -74,7 +99,7 @@ export default function MyPage() {
     ...(user.crew ? [{ icon: "🚪", label: "크루 탈퇴", action: true, danger: true, onClick: handleLeaveCrew }] : []),
     { icon: "🟢", label: "Strava 연결", tag: "미연결", tagColor: "gray" },
     { icon: "⌚", label: "Garmin 연결", tag: "미연결", tagColor: "gray" },
-    { icon: "🔔", label: "알림 설정", action: true },
+    { icon: "🔔", label: "알림 설정", action: true, onClick: handleOpenNotifySettings },
     { icon: "🔒", label: "계정 관리", action: true },
   ];
 
@@ -144,6 +169,39 @@ export default function MyPage() {
               <button onClick={() => setEditingNickname(false)} className="flex-1 py-2 text-sm text-gray-500 bg-gray-100 rounded-lg">취소</button>
               <button onClick={handleNicknameSave} className="flex-1 py-2 text-sm text-white bg-[var(--primary)] rounded-lg font-bold">저장</button>
             </div>
+          </div>
+        )}
+
+        {/* 알림 설정 패널 */}
+        {showNotifySettings && (
+          <div className="bg-white rounded-xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-bold">🔔 알림 설정</p>
+              <button onClick={() => setShowNotifySettings(false)} className="text-gray-400 text-sm">닫기</button>
+            </div>
+            {[
+              { key: 'notify_battle', label: '대항전 알림', desc: '대결 시작/승패 결과' },
+              { key: 'notify_territory', label: '점령전 알림', desc: '점령/탈환/내구도 강화' },
+              { key: 'notify_crew', label: '크루 활동 알림', desc: '크루 가입/탈퇴' },
+              { key: 'notify_ranking', label: '랭킹 변동 알림', desc: '순위 변동 알림' },
+            ].map((item) => (
+              <div key={item.key} className="flex items-center justify-between py-3 border-b border-gray-50 last:border-b-0">
+                <div>
+                  <div className="text-sm font-semibold">{item.label}</div>
+                  <div className="text-[10px] text-gray-400">{item.desc}</div>
+                </div>
+                <button
+                  onClick={() => handleToggleNotify(item.key)}
+                  className={`w-12 h-7 rounded-full transition-colors relative ${
+                    notifySettings[item.key as keyof typeof notifySettings] ? 'bg-[var(--primary)]' : 'bg-gray-300'
+                  }`}
+                >
+                  <div className={`w-5 h-5 bg-white rounded-full absolute top-1 transition-transform ${
+                    notifySettings[item.key as keyof typeof notifySettings] ? 'translate-x-6' : 'translate-x-1'
+                  }`} />
+                </button>
+              </div>
+            ))}
           </div>
         )}
 
