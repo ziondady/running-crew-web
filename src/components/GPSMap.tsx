@@ -119,13 +119,36 @@ export default function GPSMap({ points, currentPos }: GPSMapProps) {
 
     // Add start marker
     if (latLngs.length > 0 && !(map as any)._startMarkerAdded) {
-      L.circleMarker(latLngs[0], {
-        radius: 6,
-        fillColor: "#4CAF50",
-        fillOpacity: 1,
-        color: "#fff",
-        weight: 2,
-      }).addTo(map);
+      // Inject glow animation CSS once
+      if (!document.getElementById("start-marker-style")) {
+        const style = document.createElement("style");
+        style.id = "start-marker-style";
+        style.textContent = `
+          @keyframes startMarkerGlow {
+            0%, 100% { box-shadow: 0 0 6px rgba(76,175,80,0.6); }
+            50%       { box-shadow: 0 0 14px rgba(76,175,80,1); }
+          }
+          .start-marker-pin {
+            animation: startMarkerGlow 2s ease-in-out infinite;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+
+      const startIcon = L.divIcon({
+        className: "start-marker",
+        html: `<div class="start-marker-pin" style="
+          width: 28px; height: 28px;
+          background: #4CAF50;
+          border: 3px solid #fff;
+          border-radius: 50% 50% 50% 0;
+          transform: rotate(-45deg);
+          display: flex; align-items: center; justify-content: center;
+        "><span style="transform: rotate(45deg); color: white; font-weight: 900; font-size: 12px; line-height: 1;">S</span></div>`,
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
+      });
+      L.marker(latLngs[0], { icon: startIcon }).addTo(map);
       (map as any)._startMarkerAdded = true;
     }
   }, [points, currentPos]);

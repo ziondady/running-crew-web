@@ -16,6 +16,9 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
+    BackgroundGeolocation: {
+      // iOS: Background Modes > Location updates 필요
+    },
   },
 };
 
