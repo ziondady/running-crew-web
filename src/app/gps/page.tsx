@@ -1,9 +1,11 @@
 "use client";
-import { API_BASE } from "@/lib/api";import { useState, useRef, useEffect, useCallback } from "react";
+import { API_BASE } from "@/lib/api";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getStoredUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
+import { saveLocation } from "@/lib/location";
 
 
 // Dynamic import for Leaflet (SSR 불가)
@@ -65,13 +67,17 @@ export default function GPSPage() {
 
   const addPoint = useCallback((lat: number, lng: number) => {
     const now = Date.now();
+    saveLocation(lat, lng);
     setPoints((prev) => {
       const newPoint: GpsPoint = { lat, lng, timestamp: now };
       if (prev.length > 0) {
         const last = prev[prev.length - 1];
         const d = haversine(last.lat, last.lng, lat, lng);
-        // 최소 3m 이동해야 기록 (GPS 노이즈 필터링)
-        if (d < 0.001) return prev; // 1m 미만 이동은 노이즈
+        const timeDiff = now - last.timestamp;
+        // 노이즈 필터: 3m 미만 이동 무시
+        if (d < 0.003) return prev;
+        // 직선 방지: 30초 이상 갭이면서 500m 이상 점프하면 무시 (화면 꺼졌다 켜진 경우)
+        if (timeDiff > 30000 && d > 0.5) return prev;
         setDistance((prevDist) => Math.round((prevDist + d) * 100) / 100);
       }
       return [...prev, newPoint];
@@ -127,7 +133,7 @@ export default function GPSPage() {
           showToast("📡 GPS 응답 시간 초과. 재시도 중...");
         }
       },
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 3000 }
     );
 
     // cleanup에 gpsCheck도 포함

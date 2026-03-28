@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "409228067030",
+    "project_id": "running-war-app",
+    "storage_bucket": "running-war-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:409228067030:android:6fab17589fc34737f74977",
+        "android_client_info": {
+          "package_name": "fit.run4u.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB76JWZl8UQhOvKb-kWlbFaFX2mQpNjaw4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
