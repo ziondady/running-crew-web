@@ -51,6 +51,7 @@ export default function GPSPage() {
   const [permissionDenied, setPermissionDenied] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
+  const [locked, setLocked] = useState(false);
 
   const watchIdRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -73,11 +74,9 @@ export default function GPSPage() {
       if (prev.length > 0) {
         const last = prev[prev.length - 1];
         const d = haversine(last.lat, last.lng, lat, lng);
-        const timeDiff = now - last.timestamp;
         // 노이즈 필터: 3m 미만 이동 무시
         if (d < 0.003) return prev;
-        // 직선 방지: 30초 이상 갭이면서 500m 이상 점프하면 무시 (화면 꺼졌다 켜진 경우)
-        if (timeDiff > 30000 && d > 0.5) return prev;
+        // 갭이 있어도 직선으로 연결하고 거리 합산 (나이키런클럽 방식)
         setDistance((prevDist) => Math.round((prevDist + d) * 100) / 100);
       }
       return [...prev, newPoint];
@@ -261,10 +260,34 @@ export default function GPSPage() {
           ←
         </button>
 
-        {/* Status badge */}
+        {/* Status badge + Lock button */}
         {status === "running" && (
-          <div className="absolute top-4 right-4 z-[1000] bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full" style={{ animation: "dDayPulse 2s ease-in-out infinite" }}>
-            ● REC
+          <div className="absolute top-4 right-4 z-[1000] flex gap-2">
+            <button
+              onClick={() => setLocked(true)}
+              className="bg-black/50 text-white text-xs font-bold px-3 py-1 rounded-full"
+            >
+              🔒
+            </button>
+            <div className="bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full" style={{ animation: "dDayPulse 2s ease-in-out infinite" }}>
+              ● REC
+            </div>
+          </div>
+        )}
+
+        {/* 화면잠금 오버레이 */}
+        {locked && (
+          <div
+            className="absolute inset-0 z-[2000] flex items-center justify-center bg-black/70"
+            onDoubleClick={() => setLocked(false)}
+          >
+            <div className="text-center">
+              <div className="text-4xl mb-3">🔒</div>
+              <div className="text-white text-sm font-bold">화면이 잠겨있습니다</div>
+              <div className="text-gray-400 text-xs mt-1">두 번 터치하면 잠금 해제</div>
+              <div className="text-white text-2xl font-black mt-4">{fmtKm(distance)} km</div>
+              <div className="text-gray-400 text-xs mt-1">{formatTime(elapsed)}</div>
+            </div>
           </div>
         )}
       </div>
