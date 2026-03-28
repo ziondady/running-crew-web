@@ -136,7 +136,7 @@ export default function GPSMap({ points, currentPos }: GPSMapProps) {
       }
 
       const startIcon = L.divIcon({
-        className: "start-marker",
+        className: "",
         html: `<div class="start-marker-pin" style="
           width: 28px; height: 28px;
           background: #4CAF50;
