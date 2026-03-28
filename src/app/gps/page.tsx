@@ -377,7 +377,7 @@ export default function GPSPage() {
           <div className="space-y-2">
             <button
               onClick={handleSave}
-              disabled={saving || points.length < 2}
+              disabled={saving || distance < 0.01}
               className="w-full bg-[#FF5722] text-white rounded-xl py-4 text-sm font-bold active:scale-95 transition-transform disabled:opacity-50"
             >
               {saving ? "저장 중..." : `💾 저장하기 (${fmtKm(distance)}km)`}
