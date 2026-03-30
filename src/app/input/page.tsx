@@ -88,13 +88,13 @@ export default function InputPage() {
 
   return (
     <AppShell>
-      <TopBar title="➕ 거리 입력" settingsButton />
+      <TopBar title="🏃 러닝" settingsButton />
       <div className="p-4">
         {/* Tabs */}
         <div className="flex gap-1 mb-4">
           {[
-            { label: "✏️ 수동", active: true },
             { label: "📍 GPS", href: "/gps" },
+            { label: "✏️ 수동", active: true },
             { label: "📁 파일", href: "/upload" },
             { label: "🟢 Strava", disabled: true },
           ].map((tab, i) => (

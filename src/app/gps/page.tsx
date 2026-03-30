@@ -468,7 +468,7 @@ export default function GPSPage() {
         <button
           onClick={() => {
             if (status === "running") pauseTracking();
-            router.back();
+            router.push("/home");
           }}
           className="absolute top-4 left-4 z-[1000] bg-black/50 text-white w-10 h-10 rounded-full flex items-center justify-center text-lg"
         >
