@@ -91,13 +91,13 @@ export default function GPSPage() {
       startTime: number
     ) => {
       const data: SessionData = { points: pts, distance: dist, elapsed: el, status: st, startTime };
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(data));
+      localStorage.setItem(SESSION_KEY, JSON.stringify(data));
     },
     []
   );
 
   const clearSession = useCallback(() => {
-    sessionStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_KEY);
   }, []);
 
   // --- Wake Lock ---
@@ -195,15 +195,16 @@ export default function GPSPage() {
       setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
     }, 1000);
 
-    // GPS signal check every 3 s
+    // GPS signal check every 5s — 정지 시에도 gpsAccuracy가 있으면 신호 양호로 판단
     const gpsCheckInterval = setInterval(() => {
       if (lastGpsTimeRef.current > 0) {
         const gap = Date.now() - lastGpsTimeRef.current;
-        if (gap > 10000) {
+        // distanceFilter 사용 시 정지하면 업데이트 안 옴 → 30초 이상 & 정확도 없을 때만 경고
+        if (gap > 30000) {
           showToast("📡 GPS 신호를 찾는 중...");
         }
       }
-    }, 3000);
+    }, 5000);
 
     // Shared position handler (BackgroundGeolocation location shape)
     const handleBgLocation = (
@@ -333,7 +334,7 @@ export default function GPSPage() {
   // --- Restore session on mount ---
   useEffect(() => {
     try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
+      const raw = localStorage.getItem(SESSION_KEY);
       if (raw) {
         const data: SessionData = JSON.parse(raw);
         if (data.points && data.points.length > 0) {

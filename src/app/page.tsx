@@ -23,6 +23,17 @@ export default function LoginPage() {
 
     const user = getStoredUser();
     if (user) {
+      // GPS 세션이 남아있으면 GPS 페이지로 복귀
+      const gpsSession = localStorage.getItem("gps_session");
+      if (gpsSession) {
+        try {
+          const data = JSON.parse(gpsSession);
+          if (data.points && data.points.length > 0) {
+            router.replace("/gps");
+            return;
+          }
+        } catch {}
+      }
       if (token) {
         router.replace(`/join?token=${token}`);
       } else {
