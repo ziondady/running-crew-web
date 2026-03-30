@@ -6,7 +6,6 @@ import dynamic from "next/dynamic";
 import { getStoredUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
 import { saveLocation } from "@/lib/location";
-import { Geolocation } from "@capacitor/geolocation";
 import { registerPlugin } from "@capacitor/core";
 
 // BackgroundGeolocation은 네이티브 전용 플러그인 — Capacitor 브릿지로 등록
@@ -174,7 +173,7 @@ export default function GPSPage() {
     }
     if (fgWatchIdRef.current !== null) {
       try {
-        await Geolocation.clearWatch({ id: fgWatchIdRef.current });
+        navigator.geolocation.clearWatch(Number(fgWatchIdRef.current));
       } catch {
         // Ignore
       }
@@ -247,48 +246,37 @@ export default function GPSPage() {
       // BackgroundGeolocation unavailable (e.g. web browser) — fall through to Capacitor Geolocation
     }
 
-    // --- FALLBACK: Capacitor Geolocation.watchPosition ---
+    // --- FALLBACK: navigator.geolocation.watchPosition ---
     if (!bgStarted) {
       try {
-        await Geolocation.requestPermissions();
-        const watchId = await Geolocation.watchPosition(
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 },
-          (position, err) => {
-            if (err) {
-              if ((err as any).code === 1) {
-                setPermissionDenied(true);
-                setError("GPS 권한이 거부되었습니다. 설정에서 위치 권한을 허용해주세요.");
-                stopTracking();
-              } else if ((err as any).code === 2) {
-                showToast("📡 GPS를 찾을 수 없습니다. 실외로 이동해주세요");
-              } else if ((err as any).code === 3) {
-                showToast("📡 GPS 응답 시간 초과. 재시도 중...");
-              }
-              return;
-            }
-            if (!position) return;
-
+        const nativeWatchId = navigator.geolocation.watchPosition(
+          (position) => {
             const { latitude, longitude, accuracy, speed } = position.coords;
             setGpsAccuracy(Math.round(accuracy));
             lastGpsTimeRef.current = Date.now();
-
             if (accuracy > 20) {
               showToast(`📡 GPS 정확도 낮음 (${Math.round(accuracy)}m)`);
               return;
             }
             addPoint(latitude, longitude, speed);
-          }
+          },
+          (err) => {
+            if (err.code === 1) {
+              setPermissionDenied(true);
+              setError("GPS 권한이 거부되었습니다. 설정에서 위치 권한을 허용해주세요.");
+            } else if (err.code === 2) {
+              showToast("📡 GPS를 찾을 수 없습니다. 실외로 이동해주세요");
+            } else if (err.code === 3) {
+              showToast("📡 GPS 응답 시간 초과. 재시도 중...");
+            }
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
-        fgWatchIdRef.current = watchId;
+        fgWatchIdRef.current = String(nativeWatchId);
       } catch (fgErr: any) {
-        if (fgErr?.code === 1) {
-          setPermissionDenied(true);
-          setError("GPS 권한이 거부되었습니다. 설정에서 위치 권한을 허용해주세요.");
-        } else {
-          setError("GPS를 시작할 수 없습니다.");
-        }
+        setError("GPS를 시작할 수 없습니다.");
         clearInterval(gpsCheckInterval);
-        clearInterval(timerRef.current!);
+        if (timerRef.current) clearInterval(timerRef.current);
         timerRef.current = null;
         setStatus("idle");
         await releaseWakeLock();
