@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import "./globals.css";
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export const metadata: Metadata = {
   title: "러닝크루",
   description: "함께 달리고, 함께 성장",

@@ -123,7 +123,7 @@ export default function LoginPage() {
           placeholder="아이디"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
-          className="w-full bg-white/10 border border-white/20 rounded-xl py-3 px-4 text-white text-sm outline-none placeholder:text-gray-500 focus:border-[var(--primary)]"
+          className="w-full bg-white/10 border border-white/20 rounded-xl py-3 px-4 text-white text-base outline-none placeholder:text-gray-500 focus:border-[var(--primary)]"
         />
 
         {/* Nickname (register only) */}
@@ -133,7 +133,7 @@ export default function LoginPage() {
             placeholder="닉네임 (화면에 표시되는 이름)"
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
-            className="w-full bg-white/10 border border-white/20 rounded-xl py-3 px-4 text-white text-sm outline-none placeholder:text-gray-500 focus:border-[var(--primary)]"
+            className="w-full bg-white/10 border border-white/20 rounded-xl py-3 px-4 text-white text-base outline-none placeholder:text-gray-500 focus:border-[var(--primary)]"
           />
         )}
 
@@ -144,7 +144,7 @@ export default function LoginPage() {
             placeholder="이메일"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-white/10 border border-white/20 rounded-xl py-3 px-4 text-white text-sm outline-none placeholder:text-gray-500 focus:border-[var(--primary)]"
+            className="w-full bg-white/10 border border-white/20 rounded-xl py-3 px-4 text-white text-base outline-none placeholder:text-gray-500 focus:border-[var(--primary)]"
           />
         )}
 
@@ -155,7 +155,7 @@ export default function LoginPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-          className="w-full bg-white/10 border border-white/20 rounded-xl py-3 px-4 text-white text-sm outline-none placeholder:text-gray-500 focus:border-[var(--primary)]"
+          className="w-full bg-white/10 border border-white/20 rounded-xl py-3 px-4 text-white text-base outline-none placeholder:text-gray-500 focus:border-[var(--primary)]"
         />
 
         {/* Error */}
