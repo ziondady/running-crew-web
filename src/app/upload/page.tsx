@@ -84,8 +84,32 @@ export default function UploadPage() {
 
   return (
     <AppShell>
-      <TopBar title="📁 파일 업로드" back settingsButton />
+      <TopBar title="🏃 러닝" settingsButton />
       <div className="p-4 space-y-4">
+        {/* Tabs */}
+        <div className="flex gap-1">
+          {[
+            { label: "📍 GPS", href: "/gps" },
+            { label: "✏️ 수동", href: "/input" },
+            { label: "📁 파일", active: true },
+            { label: "🟢 Strava", disabled: true },
+          ].map((tab, i) => (
+            <button
+              key={i}
+              onClick={() => tab.href ? router.push(tab.href) : undefined}
+              disabled={tab.disabled}
+              className={`flex-1 text-center py-2 rounded-lg text-xs font-bold ${
+                tab.active
+                  ? "bg-[var(--primary)] text-white"
+                  : tab.disabled
+                    ? "bg-gray-100 text-gray-300"
+                    : "bg-gray-200 text-gray-500"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
         {/* Header */}
         <div className="rounded-xl p-4 text-white shadow" style={{ background: "linear-gradient(135deg, #FF5722, #FF8A65)" }}>
           <div className="font-bold text-base">Garmin / GPS 파일 업로드</div>

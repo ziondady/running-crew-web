@@ -439,6 +439,31 @@ export default function GPSPage() {
         </div>
       )}
 
+      {/* Tabs */}
+      <div className="flex gap-1 p-2 bg-[#1a2a3a] flex-shrink-0">
+        {[
+          { label: "📍 GPS", active: true },
+          { label: "✏️ 수동", href: "/input" },
+          { label: "📁 파일", href: "/upload" },
+          { label: "🟢 Strava", disabled: true },
+        ].map((tab, i) => (
+          <button
+            key={i}
+            onClick={() => tab.href ? router.push(tab.href) : undefined}
+            disabled={tab.disabled}
+            className={`flex-1 text-center py-2 rounded-lg text-xs font-bold ${
+              tab.active
+                ? "bg-[var(--primary)] text-white"
+                : tab.disabled
+                  ? "bg-gray-800 text-gray-600"
+                  : "bg-gray-700 text-gray-300"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Map - fills remaining space */}
       <div className="flex-1 relative">
         <MapView points={points} currentPos={currentPos} />
