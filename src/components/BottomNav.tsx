@@ -14,7 +14,7 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <div className="w-full bg-white border-t border-gray-200 flex">
+    <div className="w-full bg-white border-t border-gray-200 flex" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
       {navItems.map((item) => {
         const active = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)) || item.aliases.some((a) => pathname.startsWith(a));
         return (

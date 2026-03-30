@@ -11,7 +11,7 @@ export default function TopBar({
 }) {
   const router = useRouter();
   return (
-    <div className="w-full bg-[var(--dark)] text-white px-4 py-3 text-sm font-bold flex items-center gap-2">
+    <div className="w-full bg-[var(--dark)] text-white px-4 py-3 text-sm font-bold flex items-center gap-2" style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}>
       {back && <button onClick={() => window.history.back()} className="opacity-60 text-xs">←</button>}
       <span className="flex-1">{title}</span>
       {right}

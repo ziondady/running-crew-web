@@ -440,7 +440,7 @@ export default function GPSPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 p-2 bg-[#1a2a3a] flex-shrink-0">
+      <div className="flex gap-1 p-2 bg-[#1a2a3a] flex-shrink-0" style={{ paddingTop: "calc(env(safe-area-inset-top) + 8px)" }}>
         {[
           { label: "📍 GPS", active: true },
           { label: "✏️ 수동", href: "/input" },
