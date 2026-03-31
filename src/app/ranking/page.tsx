@@ -59,6 +59,8 @@ function RankingContent() {
   ) => {
     setRankingLoading(true);
     setError("");
+    setExpandedUserId(null);
+    setDetailLogs([]);
     try {
       if (subTab === "daily") {
         const data = await getDailyRanking(user.crew ?? undefined, date);
