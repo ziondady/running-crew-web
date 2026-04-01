@@ -138,11 +138,18 @@ export default function GPSPage() {
         if (prev.length > 0) {
           const last = prev[prev.length - 1];
           const d = haversine(last.lat, last.lng, lat, lng);
-          // Speed-based noise filter: standing still (speed < 0.3 m/s) AND tiny move (< 5m) → skip
+          const timeDelta = (now - last.timestamp) / 1000; // seconds
+
+          // 1. GPS 튐 방지: 시간 대비 비현실적 이동 (50km/h 이상) → skip
+          if (timeDelta > 0 && d / timeDelta > 0.0139) return prev;
+
+          // 2. 정지 상태 필터: speed < 0.5 m/s AND 이동 < 10m → skip
           const spd = speed ?? null;
-          if (spd !== null && spd < 0.3 && d < 0.005) return prev;
-          // Distance noise filter: < 3m → skip (fallback when speed unavailable)
-          if (d < 0.003) return prev;
+          if (spd !== null && spd < 0.5 && d < 0.01) return prev;
+
+          // 3. 최소 이동 거리: < 5m → skip (GPS 지터 누적 방지)
+          if (d < 0.005) return prev;
+
           setDistance((prevDist) => Math.round((prevDist + d) * 100) / 100);
         }
         return [...prev, newPoint];
@@ -220,7 +227,7 @@ export default function GPSPage() {
       setGpsAccuracy(Math.round(accuracy));
       lastGpsTimeRef.current = Date.now();
 
-      if (accuracy > 20) {
+      if (accuracy > 15) {
         showToast(`📡 GPS 정확도 낮음 (${Math.round(accuracy)}m)`);
         return;
       }
@@ -254,7 +261,7 @@ export default function GPSPage() {
             const { latitude, longitude, accuracy, speed } = position.coords;
             setGpsAccuracy(Math.round(accuracy));
             lastGpsTimeRef.current = Date.now();
-            if (accuracy > 20) {
+            if (accuracy > 15) {
               showToast(`📡 GPS 정확도 낮음 (${Math.round(accuracy)}m)`);
               return;
             }
