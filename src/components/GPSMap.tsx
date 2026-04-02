@@ -48,10 +48,8 @@ export default function GPSMap({ points, currentPos }: GPSMapProps) {
         btn.style.cssText = "width:34px;height:34px;background:#fff;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;margin-bottom:0;";
         btn.onclick = (e) => {
           e.stopPropagation();
-          navigator.geolocation?.getCurrentPosition(
-            (pos) => { saveLocation(pos.coords.latitude, pos.coords.longitude); if (mapRef.current) mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 16); },
-            () => {}, { enableHighAccuracy: true }
-          );
+          const loc = getCachedLocation();
+          if (loc && mapRef.current) mapRef.current.setView([loc.lat, loc.lng], 16);
         };
         return btn;
       },
@@ -60,19 +58,7 @@ export default function GPSMap({ points, currentPos }: GPSMapProps) {
 
     mapRef.current = map;
 
-    // Try to get initial position
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          saveLocation(pos.coords.latitude, pos.coords.longitude);
-          if (mapRef.current) {
-            mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 16);
-          }
-        },
-        () => {},
-        { enableHighAccuracy: true }
-      );
-    }
+    // 초기 위치는 캐시 사용 (네이티브 GPS가 업데이트하면 currentPos로 지도 이동됨)
 
     return () => {
       map.remove();

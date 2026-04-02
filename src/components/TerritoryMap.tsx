@@ -58,10 +58,8 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
         btn.style.cssText = "width:34px;height:34px;background:#fff;border-radius:4px;box-shadow:0 1px 5px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;margin-bottom:0;";
         btn.onclick = (e) => {
           e.stopPropagation();
-          navigator.geolocation?.getCurrentPosition(
-            (pos) => { saveLocation(pos.coords.latitude, pos.coords.longitude); if (mapRef.current) mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 15); },
-            () => {}, { enableHighAccuracy: true }
-          );
+          const loc = getCachedLocation();
+          if (loc && mapRef.current) mapRef.current.setView([loc.lat, loc.lng], 15);
         };
         return btn;
       },
@@ -71,17 +69,7 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
     layersRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 
-    // Try current location
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          saveLocation(pos.coords.latitude, pos.coords.longitude);
-          if (mapRef.current) mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 14);
-        },
-        () => {},
-        { enableHighAccuracy: true }
-      );
-    }
+    // 초기 위치는 캐시 사용
 
     return () => {
       map.remove();
