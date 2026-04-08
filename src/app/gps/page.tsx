@@ -7,6 +7,8 @@ import { getStoredUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
 import { saveLocation } from "@/lib/location";
 import { registerPlugin } from "@capacitor/core";
+import { checkGpsPermission, PermissionStatus } from "@/lib/gpsPermissions";
+import { startBackup, appendPoint as appendBackupPoint, readBackup, clearBackup } from "@/lib/gpsBackup";
 
 // BackgroundGeolocation은 네이티브 전용 플러그인 — Capacitor 브릿지로 등록
 interface BgGeoPlugin {
@@ -33,6 +35,15 @@ interface SessionData {
 }
 
 const SESSION_KEY = "gps_session";
+const SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000; // 24h
+
+// Watcher health check constants
+const HEALTH_CHECK_INTERVAL_MS = 10_000;       // 10s 마다 체크
+const WATCHER_STALE_THRESHOLD_MS = 45_000;     // 45s 끊기면 재시작
+const SIGNAL_WARNING_THRESHOLD_MS = 20_000;    // 20s 끊기면 경고만
+const FIRST_POINT_TIMEOUT_MS = 20_000;         // 시작 20s 안에 첫 포인트 없으면 경고
+const MAX_RESTART_ATTEMPTS = 3;                // 1분 내 재시작 최대 횟수
+const RESTART_WINDOW_MS = 60_000;
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
@@ -80,6 +91,18 @@ export default function GPSPage() {
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
+  // --- Health check & recovery state ---
+  const statusRef = useRef<"idle" | "running" | "paused" | "stopped">("idle");
+  const healthCheckRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const firstPointTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const restartStateRef = useRef({ count: 0, windowStart: 0 });
+  const lastWarnRef = useRef(0);
+  const [permissionStatus, setPermissionStatus] = useState<PermissionStatus | null>(null);
+  const [recoveryPrompt, setRecoveryPrompt] = useState<{ points: GpsPoint[]; distance: number; elapsed: number; startTime: number } | null>(null);
+
+  // status state를 ref에 동기화 (setInterval 클로저 안에서 최신 값 필요)
+  useEffect(() => { statusRef.current = status; }, [status]);
+
   // --- Session persistence helpers ---
   const saveSession = useCallback(
     (
@@ -89,7 +112,10 @@ export default function GPSPage() {
       st: "idle" | "running" | "paused" | "stopped",
       startTime: number
     ) => {
-      const data: SessionData = { points: pts, distance: dist, elapsed: el, status: st, startTime };
+      const data: SessionData & { savedAt: number } = {
+        points: pts, distance: dist, elapsed: el, status: st, startTime,
+        savedAt: Date.now(),
+      };
       localStorage.setItem(SESSION_KEY, JSON.stringify(data));
     },
     []
@@ -135,6 +161,8 @@ export default function GPSPage() {
       saveLocation(lat, lng);
       setPoints((prev) => {
         const newPoint: GpsPoint = { lat, lng, timestamp: now };
+        // 네이티브 백업 파일에 즉시 append (fire-and-forget)
+        appendBackupPoint({ lat, lng, timestamp: now }).catch(() => {});
         if (prev.length > 0) {
           const last = prev[prev.length - 1];
           const d = haversine(last.lat, last.lng, lat, lng);
@@ -188,54 +216,29 @@ export default function GPSPage() {
     }
   }, []);
 
-  // --- Start tracking ---
-  const startTracking = useCallback(async () => {
-    setError(null);
-    setStatus("running");
-    startTimeRef.current = Date.now() - pausedTimeRef.current * 1000;
-
-    await requestWakeLock();
-
-    // Timer
-    timerRef.current = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
-    }, 1000);
-
-    // GPS signal check every 5s — 정지 시에도 gpsAccuracy가 있으면 신호 양호로 판단
-    const gpsCheckInterval = setInterval(() => {
-      if (lastGpsTimeRef.current > 0) {
-        const gap = Date.now() - lastGpsTimeRef.current;
-        // distanceFilter 사용 시 정지하면 업데이트 안 옴 → 30초 이상 & 정확도 없을 때만 경고
-        if (gap > 30000) {
-          showToast("📡 GPS 신호를 찾는 중...");
-        }
-      }
-    }, 5000);
-
-    // Shared position handler (BackgroundGeolocation location shape)
-    const handleBgLocation = (
-      location: { latitude: number; longitude: number; accuracy: number; speed: number | null } | null,
-      error: Error | null
-    ) => {
-      if (error) {
-        // BackgroundGeolocation failed → will fall back to Capacitor Geolocation below
-        return;
-      }
-      if (!location) return;
-
-      const { latitude, longitude, accuracy, speed } = location;
-      setGpsAccuracy(Math.round(accuracy));
-      lastGpsTimeRef.current = Date.now();
-
-      if (accuracy > 15) {
+  // --- Position handler (shared across initial start and health-check restarts) ---
+  const handleBgLocation = useCallback((
+    location: { latitude: number; longitude: number; accuracy: number; speed: number | null } | null,
+    error: Error | null
+  ) => {
+    if (error) return;
+    if (!location) return;
+    const { latitude, longitude, accuracy, speed } = location;
+    setGpsAccuracy(Math.round(accuracy));
+    lastGpsTimeRef.current = Date.now();
+    if (accuracy > 15) {
+      const now = Date.now();
+      if (now - lastWarnRef.current > 15_000) {
         showToast(`📡 GPS 정확도 낮음 (${Math.round(accuracy)}m)`);
-        return;
+        lastWarnRef.current = now;
       }
-      addPoint(latitude, longitude, speed);
-    };
+      return;
+    }
+    addPoint(latitude, longitude, speed);
+  }, [addPoint, showToast]);
 
-    // --- PRIMARY: BackgroundGeolocation ---
-    let bgStarted = false;
+  // --- Native BG watcher start (returns true on success) ---
+  const startNativeWatcher = useCallback(async (): Promise<boolean> => {
     try {
       const watcherId = await BackgroundGeolocation.addWatcher(
         {
@@ -248,52 +251,157 @@ export default function GPSPage() {
         handleBgLocation
       );
       bgWatcherIdRef.current = watcherId;
-      bgStarted = true;
-    } catch (bgErr) {
-      // BackgroundGeolocation unavailable (e.g. web browser) — fall through to Capacitor Geolocation
+      return true;
+    } catch {
+      return false;
+    }
+  }, [handleBgLocation]);
+
+  // --- Fallback foreground watcher (web browser or native failure) ---
+  const startFgWatcher = useCallback((): boolean => {
+    try {
+      const nativeWatchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const { latitude, longitude, accuracy, speed } = position.coords;
+          setGpsAccuracy(Math.round(accuracy));
+          lastGpsTimeRef.current = Date.now();
+          if (accuracy > 15) {
+            const now = Date.now();
+            if (now - lastWarnRef.current > 15_000) {
+              showToast(`📡 GPS 정확도 낮음 (${Math.round(accuracy)}m)`);
+              lastWarnRef.current = now;
+            }
+            return;
+          }
+          addPoint(latitude, longitude, speed);
+        },
+        (err) => {
+          if (err.code === 1) {
+            setPermissionDenied(true);
+            setError("GPS 권한이 거부되었습니다. 설정에서 위치 권한을 허용해주세요.");
+          } else if (err.code === 2) {
+            showToast("📡 GPS를 찾을 수 없습니다. 실외로 이동해주세요");
+          } else if (err.code === 3) {
+            showToast("📡 GPS 응답 시간 초과. 재시도 중...");
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+      fgWatchIdRef.current = String(nativeWatchId);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [addPoint, showToast]);
+
+  // --- Health-check: automatic watcher restart on stale/dead signal ---
+  const restartWatcher = useCallback(async () => {
+    const now = Date.now();
+    const state = restartStateRef.current;
+    // Reset window if outside
+    if (now - state.windowStart > RESTART_WINDOW_MS) {
+      state.count = 0;
+      state.windowStart = now;
+    }
+    if (state.count >= MAX_RESTART_ATTEMPTS) {
+      showToast("⚠️ GPS 복구 실패. 앱을 다시 실행해주세요.");
+      return;
+    }
+    state.count += 1;
+
+    showToast("🔄 GPS 재연결 중...");
+
+    // 기존 watcher 정리
+    await stopAllWatchers();
+
+    // 재시작
+    const ok = await startNativeWatcher();
+    if (!ok) {
+      startFgWatcher();
+    }
+    lastGpsTimeRef.current = Date.now(); // grace period
+  }, [stopAllWatchers, startNativeWatcher, startFgWatcher, showToast]);
+
+  const startHealthCheck = useCallback(() => {
+    // 첫 포인트 타임아웃
+    if (firstPointTimeoutRef.current) clearTimeout(firstPointTimeoutRef.current);
+    firstPointTimeoutRef.current = setTimeout(() => {
+      if (statusRef.current === "running" && lastGpsTimeRef.current === 0) {
+        showToast("📡 GPS 신호를 찾지 못했습니다. 실외로 이동해주세요");
+      }
+    }, FIRST_POINT_TIMEOUT_MS);
+
+    // 주기 health check
+    if (healthCheckRef.current) clearInterval(healthCheckRef.current);
+    healthCheckRef.current = setInterval(() => {
+      if (statusRef.current !== "running") return;
+      const last = lastGpsTimeRef.current;
+      if (last === 0) return;
+      const gap = Date.now() - last;
+      if (gap > WATCHER_STALE_THRESHOLD_MS) {
+        restartWatcher();
+      } else if (gap > SIGNAL_WARNING_THRESHOLD_MS) {
+        const now = Date.now();
+        if (now - lastWarnRef.current > 15_000) {
+          showToast(`📡 GPS 신호 약함 (${Math.floor(gap / 1000)}초)`);
+          lastWarnRef.current = now;
+        }
+      }
+    }, HEALTH_CHECK_INTERVAL_MS);
+  }, [restartWatcher, showToast]);
+
+  const stopHealthCheck = useCallback(() => {
+    if (firstPointTimeoutRef.current) {
+      clearTimeout(firstPointTimeoutRef.current);
+      firstPointTimeoutRef.current = null;
+    }
+    if (healthCheckRef.current) {
+      clearInterval(healthCheckRef.current);
+      healthCheckRef.current = null;
+    }
+  }, []);
+
+  // --- Start tracking ---
+  const startTracking = useCallback(async () => {
+    setError(null);
+    setStatus("running");
+    statusRef.current = "running";
+    startTimeRef.current = Date.now() - pausedTimeRef.current * 1000;
+    lastGpsTimeRef.current = 0; // reset so first-point timeout kicks in
+    restartStateRef.current = { count: 0, windowStart: Date.now() };
+
+    await requestWakeLock();
+
+    // 네이티브 백업 파일 초기화 (이어달리기면 기존 백업 유지, 신규 시작이면 초기화)
+    if (points.length === 0) {
+      try { await startBackup(); } catch {}
     }
 
-    // --- FALLBACK: navigator.geolocation.watchPosition ---
-    if (!bgStarted) {
-      try {
-        const nativeWatchId = navigator.geolocation.watchPosition(
-          (position) => {
-            const { latitude, longitude, accuracy, speed } = position.coords;
-            setGpsAccuracy(Math.round(accuracy));
-            lastGpsTimeRef.current = Date.now();
-            if (accuracy > 15) {
-              showToast(`📡 GPS 정확도 낮음 (${Math.round(accuracy)}m)`);
-              return;
-            }
-            addPoint(latitude, longitude, speed);
-          },
-          (err) => {
-            if (err.code === 1) {
-              setPermissionDenied(true);
-              setError("GPS 권한이 거부되었습니다. 설정에서 위치 권한을 허용해주세요.");
-            } else if (err.code === 2) {
-              showToast("📡 GPS를 찾을 수 없습니다. 실외로 이동해주세요");
-            } else if (err.code === 3) {
-              showToast("📡 GPS 응답 시간 초과. 재시도 중...");
-            }
-          },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-        );
-        fgWatchIdRef.current = String(nativeWatchId);
-      } catch (fgErr: any) {
+    // Timer
+    timerRef.current = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
+    }, 1000);
+
+    // PRIMARY: native BG watcher
+    const bgOk = await startNativeWatcher();
+
+    // FALLBACK: foreground watcher
+    if (!bgOk) {
+      const fgOk = startFgWatcher();
+      if (!fgOk) {
         setError("GPS를 시작할 수 없습니다.");
-        clearInterval(gpsCheckInterval);
         if (timerRef.current) clearInterval(timerRef.current);
         timerRef.current = null;
         setStatus("idle");
+        statusRef.current = "idle";
         await releaseWakeLock();
         return;
       }
     }
 
-    // Store gpsCheck cleanup alongside; resolved on stop/pause
-    (timerRef as any)._gpsCheck = gpsCheckInterval;
-  }, [addPoint, requestWakeLock, releaseWakeLock, showToast, stopAllWatchers]);
+    // health check 가동
+    startHealthCheck();
+  }, [points.length, requestWakeLock, releaseWakeLock, startNativeWatcher, startFgWatcher, startHealthCheck]);
 
   // Forward-declare stopTracking so startTracking can reference it in error handler
   // eslint-disable-next-line prefer-const
@@ -301,15 +409,16 @@ export default function GPSPage() {
 
   const pauseTracking = useCallback(async () => {
     await stopAllWatchers();
+    stopHealthCheck();
     if (timerRef.current) {
       clearInterval(timerRef.current);
-      if ((timerRef as any)._gpsCheck) clearInterval((timerRef as any)._gpsCheck);
       timerRef.current = null;
     }
     pausedTimeRef.current = elapsed;
     setStatus("paused");
+    statusRef.current = "paused";
     await releaseWakeLock();
-  }, [elapsed, stopAllWatchers, releaseWakeLock]);
+  }, [elapsed, stopAllWatchers, stopHealthCheck, releaseWakeLock]);
 
   const resumeTracking = useCallback(() => {
     startTracking();
@@ -317,34 +426,85 @@ export default function GPSPage() {
 
   stopTracking = useCallback(async () => {
     await stopAllWatchers();
+    stopHealthCheck();
     if (timerRef.current) {
       clearInterval(timerRef.current);
-      if ((timerRef as any)._gpsCheck) clearInterval((timerRef as any)._gpsCheck);
       timerRef.current = null;
     }
     setStatus("stopped");
+    statusRef.current = "stopped";
     await releaseWakeLock();
-  }, [stopAllWatchers, releaseWakeLock]);
+  }, [stopAllWatchers, stopHealthCheck, releaseWakeLock]);
 
-  // --- Restore session on mount ---
+  // --- Restore session on mount (shows prompt instead of auto-resume) ---
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(SESSION_KEY);
-      if (raw) {
-        const data: SessionData = JSON.parse(raw);
-        if (data.points && data.points.length > 0) {
-          setPoints(data.points);
-          setDistance(data.distance ?? 0);
-          setElapsed(data.elapsed ?? 0);
-          // Restore as paused regardless — user must explicitly resume
-          setStatus("paused");
-          pausedTimeRef.current = data.elapsed ?? 0;
-          startTimeRef.current = data.startTime ?? Date.now();
+    (async () => {
+      // 1. 권한 체크
+      try {
+        const p = await checkGpsPermission();
+        setPermissionStatus(p);
+      } catch {}
+
+      // 2. localStorage 세션 + 네이티브 백업 파일 병합
+      let sessionPoints: GpsPoint[] = [];
+      let sessionDistance = 0;
+      let sessionElapsed = 0;
+      let sessionStartTime = 0;
+      let sessionSavedAt = 0;
+
+      try {
+        const raw = localStorage.getItem(SESSION_KEY);
+        if (raw) {
+          const data = JSON.parse(raw) as SessionData & { savedAt?: number };
+          const savedAt = data.savedAt ?? 0;
+          // TTL 초과된 세션은 무시하고 삭제
+          if (savedAt && Date.now() - savedAt > SESSION_MAX_AGE_MS) {
+            localStorage.removeItem(SESSION_KEY);
+            await clearBackup();
+          } else if (data.points && data.points.length > 0) {
+            sessionPoints = data.points;
+            sessionDistance = data.distance ?? 0;
+            sessionElapsed = data.elapsed ?? 0;
+            sessionStartTime = data.startTime ?? Date.now();
+            sessionSavedAt = savedAt;
+          }
         }
+      } catch {}
+
+      // 3. 네이티브 백업 파일과 병합 — 백업에만 있는 최신 포인트가 있으면 추가
+      try {
+        const backup = await readBackup();
+        if (backup && backup.points.length > 0) {
+          const lastSessionTs = sessionPoints.length > 0 ? sessionPoints[sessionPoints.length - 1].timestamp : 0;
+          const newer = backup.points.filter((p) => p.timestamp > lastSessionTs);
+          if (newer.length > 0) {
+            // 백업에만 있는 포인트를 세션 포인트 뒤에 이어붙임
+            // 거리 재계산
+            const merged = [...sessionPoints, ...newer];
+            let mergedDistance = sessionDistance;
+            for (let i = Math.max(1, sessionPoints.length); i < merged.length; i++) {
+              const a = merged[i - 1];
+              const b = merged[i];
+              mergedDistance += haversine(a.lat, a.lng, b.lat, b.lng);
+            }
+            sessionPoints = merged;
+            sessionDistance = Math.round(mergedDistance * 100) / 100;
+          }
+          if (sessionStartTime === 0 && backup.meta.startedAt) {
+            sessionStartTime = backup.meta.startedAt;
+          }
+        }
+      } catch {}
+
+      if (sessionPoints.length > 0) {
+        setRecoveryPrompt({
+          points: sessionPoints,
+          distance: sessionDistance,
+          elapsed: sessionElapsed,
+          startTime: sessionStartTime || Date.now(),
+        });
       }
-    } catch {
-      // Corrupted session — ignore
-    }
+    })();
   }, []);
 
   // --- visibilitychange: save state when app goes to background ---
@@ -372,9 +532,9 @@ export default function GPSPage() {
   useEffect(() => {
     return () => {
       stopAllWatchers();
+      stopHealthCheck();
       if (timerRef.current) {
         clearInterval(timerRef.current);
-        if ((timerRef as any)._gpsCheck) clearInterval((timerRef as any)._gpsCheck);
       }
       releaseWakeLock();
     };
@@ -407,6 +567,7 @@ export default function GPSPage() {
       if (!res.ok) throw new Error("저장 실패");
       setSaved(true);
       clearSession();
+      await clearBackup();
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -419,17 +580,75 @@ export default function GPSPage() {
     setDistance(0);
     setElapsed(0);
     setStatus("idle");
+    statusRef.current = "idle";
     setSaved(false);
     setError(null);
     pausedTimeRef.current = 0;
     clearSession();
+    clearBackup().catch(() => {});
   };
 
   const pace = elapsed > 0 && distance > 0 ? distance / elapsed : 0;
   const currentPos = points.length > 0 ? points[points.length - 1] : null;
 
+  // --- Recovery handlers ---
+  const acceptRecovery = useCallback(() => {
+    if (!recoveryPrompt) return;
+    setPoints(recoveryPrompt.points);
+    setDistance(recoveryPrompt.distance);
+    setElapsed(recoveryPrompt.elapsed);
+    pausedTimeRef.current = recoveryPrompt.elapsed;
+    startTimeRef.current = recoveryPrompt.startTime;
+    setStatus("paused");
+    statusRef.current = "paused";
+    setRecoveryPrompt(null);
+  }, [recoveryPrompt]);
+
+  const dismissRecovery = useCallback(async () => {
+    setRecoveryPrompt(null);
+    clearSession();
+    await clearBackup();
+  }, [clearSession]);
+
   return (
     <div className="max-w-[430px] w-full mx-auto h-screen bg-[#1a2a3a] flex flex-col overflow-hidden relative">
+      {/* 세션 복구 다이얼로그 */}
+      {recoveryPrompt && (
+        <div className="absolute inset-0 z-[3000] flex items-center justify-center bg-black/80 px-6">
+          <div className="w-full max-w-sm bg-[#1a2a3a] border border-gray-700 rounded-2xl p-5 text-white">
+            <div className="text-center mb-4">
+              <div className="text-3xl mb-2">💾</div>
+              <div className="text-base font-bold">이전 러닝 기록이 남아있어요</div>
+              <div className="text-xs text-gray-400 mt-1">
+                저장되지 않은 세션을 복구할 수 있습니다
+              </div>
+            </div>
+            <div className="bg-black/30 rounded-lg p-3 mb-4 space-y-1 text-center">
+              <div className="text-2xl font-black text-[#FF5722]">
+                {fmtKm(recoveryPrompt.distance)} km
+              </div>
+              <div className="text-xs text-gray-400">
+                {formatTime(recoveryPrompt.elapsed)} · {recoveryPrompt.points.length} 포인트
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={dismissRecovery}
+                className="flex-1 bg-gray-700 text-gray-300 rounded-xl py-3 text-xs font-bold active:scale-95 transition-transform"
+              >
+                폐기
+              </button>
+              <button
+                onClick={acceptRecovery}
+                className="flex-1 bg-[#FF5722] text-white rounded-xl py-3 text-xs font-bold active:scale-95 transition-transform"
+              >
+                이어달리기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 화면잠금 오버레이 - full screen */}
       {locked && (
         <div
@@ -470,6 +689,16 @@ export default function GPSPage() {
           </button>
         ))}
       </div>
+
+      {/* 권한 경고 배너 */}
+      {permissionStatus && permissionStatus.level !== "always" && permissionStatus.platform !== "web" && (
+        <div className={`mx-2 mb-1 rounded-lg px-3 py-2 text-[11px] font-bold flex items-center gap-2 ${
+          permissionStatus.level === "denied" ? "bg-red-600 text-white" : "bg-yellow-600/90 text-white"
+        }`}>
+          <span>⚠️</span>
+          <span className="flex-1">{permissionStatus.message}</span>
+        </div>
+      )}
 
       {/* Map - fills remaining space */}
       <div className="flex-1 relative">
