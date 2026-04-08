@@ -8,22 +8,31 @@ import { getStoredUser, AuthUser } from "@/lib/auth";
 
 const TerritoryMap = dynamic(() => import("@/components/TerritoryMap"), { ssr: false });
 
+interface CellBounds {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+}
+
 interface TerritoryItem {
   id: number;
+  cell_key: string;
   user: number;
   username: string;
   user_color: string;
   crew_id: number | null;
   crew_name: string | null;
-  path_data: { lat: number; lng: number }[];
   durability: number;
+  bounds: CellBounds;
   last_run_at: string;
 }
 
 interface RankItem {
   crew_id: number;
   crew_name: string;
-  segments: number;
+  segments: number; // 호환: 셀 개수
+  cells?: number;
   rank: number;
 }
 
@@ -32,6 +41,7 @@ interface LogItem {
   username: string;
   action: string;
   durability: number;
+  cell_count?: number;
   created_at: string;
 }
 
@@ -89,9 +99,9 @@ export default function TerritoryPage() {
     .filter(Boolean) as { id: number; durability: number; daysLeft: number }[];
 
   const actionLabels: Record<string, { label: string; color: string; border: string }> = {
-    claim: { label: "🎉 새 구간 점령!", color: "text-green-600", border: "border-green-500" },
-    reinforce: { label: "🏰 크루 내구도 강화", color: "text-blue-600", border: "border-blue-500" },
-    takeover: { label: "⚔️ 크루 점령지 탈환당함!", color: "text-red-500", border: "border-red-500" },
+    claim: { label: "🎉 신규 셀 점령!", color: "text-green-600", border: "border-green-500" },
+    reinforce: { label: "🏰 셀 내구도 강화", color: "text-blue-600", border: "border-blue-500" },
+    takeover: { label: "⚔️ 셀 탈환당함!", color: "text-red-500", border: "border-red-500" },
     decay: { label: "📉 내구도 감소", color: "text-orange-600", border: "border-orange-400" },
   };
 
@@ -148,19 +158,19 @@ export default function TerritoryPage() {
                 ));
               })()}
               <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                선 굵기 = 내구도
+                진한 색 = 높은 내구도
               </div>
             </div>
 
             {/* Stats */}
             <div className="flex gap-2 mt-3">
               <div className="flex-1 bg-orange-50 rounded-lg p-3 text-center">
-                <div className="text-lg font-extrabold text-[var(--primary)]">{mySegments}구간</div>
-                <div className="text-[10px] text-gray-400">점령 구간</div>
+                <div className="text-lg font-extrabold text-[var(--primary)]">{mySegments}칸</div>
+                <div className="text-[10px] text-gray-400">내 점령 셀</div>
               </div>
               <div className="flex-1 bg-green-50 rounded-lg p-3 text-center">
-                <div className="text-lg font-extrabold text-green-600">{territories.length}개</div>
-                <div className="text-[10px] text-gray-400">전체 구간</div>
+                <div className="text-lg font-extrabold text-green-600">{territories.length}칸</div>
+                <div className="text-[10px] text-gray-400">전체 셀</div>
               </div>
               <div className="flex-1 bg-blue-50 rounded-lg p-3 text-center">
                 <div className="text-lg font-extrabold text-[var(--op)]">{myRankEntry?.rank || "-"}위</div>
@@ -175,11 +185,11 @@ export default function TerritoryPage() {
             {/* 점령전 현황 헤더 */}
             <div className="rounded-xl p-4 text-white mb-3" style={{ background: "linear-gradient(135deg, #2E7D32, #4CAF50)" }}>
               <div className="text-sm font-bold">{me?.crew_name || "내 크루"}</div>
-              <div className="text-xs opacity-80 mt-1">크루원이 달린 길이 점령됩니다</div>
+              <div className="text-xs opacity-80 mt-1">달린 영역(100m 격자)이 자동 점령됩니다</div>
               <div className="grid grid-cols-3 gap-2 mt-3">
                 <div className="text-center">
                   <div className="text-xl font-extrabold">{mySegments}</div>
-                  <div className="text-[9px] opacity-80">점령 구간</div>
+                  <div className="text-[9px] opacity-80">내 점령 셀</div>
                 </div>
                 <div className="text-center">
                   <div className="text-xl font-extrabold">{myRankEntry?.rank || "-"}</div>
@@ -194,7 +204,7 @@ export default function TerritoryPage() {
 
             {/* 내구도 분포 — 쉬운 설명 추가 */}
             <div className="bg-white rounded-xl p-4 shadow-sm mb-3">
-              <h3 className="text-sm font-bold text-green-700 mb-1">🏰 구간별 내구도</h3>
+              <h3 className="text-sm font-bold text-green-700 mb-1">🏰 셀 내구도 분포</h3>
               <p className="text-[10px] text-gray-400 mb-3">내구도가 높을수록 다른 크루가 빼앗기 어렵습니다</p>
               {mySegments === 0 ? (
                 <p className="text-xs text-gray-400 text-center py-2">크루원이 GPS로 달리면 점령이 시작됩니다</p>
@@ -205,7 +215,7 @@ export default function TerritoryPage() {
                     <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                       <div className="h-full rounded-full" style={{ width: `${mySegments > 0 ? (item.count / mySegments) * 100 : 0}%`, backgroundColor: durColors[item.lv] }} />
                     </div>
-                    <span className="text-xs font-semibold w-10 text-right">{item.count}구간</span>
+                    <span className="text-xs font-semibold w-10 text-right">{item.count}칸</span>
                   </div>
                 ))
               )}
@@ -215,10 +225,10 @@ export default function TerritoryPage() {
             {decayWarnings.length > 0 && (
               <div className="bg-white rounded-xl p-4 shadow-sm mb-3">
                 <h3 className="text-sm font-bold text-orange-700 mb-1">⚠️ 내구도 감소 예정</h3>
-                <p className="text-[10px] text-gray-400 mb-3">방문하지 않은 구간은 7일마다 내구도가 1씩 감소합니다</p>
+                <p className="text-[10px] text-gray-400 mb-3">방문하지 않은 셀은 7일마다 내구도가 1씩 감소합니다</p>
                 {decayWarnings.map((w) => (
                   <div key={w.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-b-0">
-                    <span className="text-xs">구간 #{w.id}</span>
+                    <span className="text-xs">셀 #{w.id}</span>
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
                       {w.daysLeft}일 후 Lv.{w.durability}→{w.durability - 1 === 0 ? "소멸" : w.durability - 1}
                     </span>

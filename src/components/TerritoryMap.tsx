@@ -2,17 +2,25 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { getCachedLocation, saveLocation } from "@/lib/location";
+import { getCachedLocation } from "@/lib/location";
+
+interface CellBounds {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+}
 
 interface TerritoryItem {
   id: number;
+  cell_key: string;
   user: number;
   username: string;
   user_color: string;
   crew_id: number | null;
   crew_name: string | null;
-  path_data: { lat: number; lng: number }[];
   durability: number;
+  bounds: CellBounds;
 }
 
 interface TerritoryMapProps {
@@ -41,7 +49,7 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
       attributionControl: false,
     });
     const cached = getCachedLocation();
-    map.setView(cached ? [cached.lat, cached.lng] : [37.5665, 126.9780], cached ? 14 : 12);
+    map.setView(cached ? [cached.lat, cached.lng] : [37.5665, 126.9780], cached ? 15 : 12);
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
@@ -59,7 +67,7 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
         btn.onclick = (e) => {
           e.stopPropagation();
           const loc = getCachedLocation();
-          if (loc && mapRef.current) mapRef.current.setView([loc.lat, loc.lng], 15);
+          if (loc && mapRef.current) mapRef.current.setView([loc.lat, loc.lng], 16);
         };
         return btn;
       },
@@ -69,15 +77,13 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
     layersRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;
 
-    // 초기 위치는 캐시 사용
-
     return () => {
       map.remove();
       mapRef.current = null;
     };
   }, []);
 
-  // Draw territories when data changes
+  // Draw territory cells when data changes
   useEffect(() => {
     if (!mapRef.current || !layersRef.current) return;
     const layers = layersRef.current;
@@ -85,12 +91,9 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
 
     if (territories.length === 0) return;
 
-    const allPoints: [number, number][] = [];
-
     // Build crew color map
     const crewIds = [...new Set(territories.map(t => t.crew_id).filter(Boolean))] as number[];
     const crewColorMap: Record<number, string> = {};
-    // My crew always gets index 0 (primary color)
     if (myCrewId) {
       crewColorMap[myCrewId] = CREW_COLORS[0];
     }
@@ -102,30 +105,31 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
       }
     });
 
-    territories.forEach((t) => {
-      if (!t.path_data || t.path_data.length < 2) return;
+    const allBounds: [number, number][] = [];
 
-      const latLngs: [number, number][] = t.path_data.map((p) => [p.lat, p.lng]);
-      allPoints.push(...latLngs);
+    territories.forEach((t) => {
+      if (!t.bounds) return;
+      const { south, west, north, east } = t.bounds;
+      allBounds.push([south, west], [north, east]);
 
       const isMyCrew = t.crew_id === myCrewId;
       const color = t.crew_id ? (crewColorMap[t.crew_id] || "#999") : "#999";
 
-      // Line weight based on durability (1-5)
-      const weight = 2 + t.durability * 1.5;
-      const opacity = 0.4 + t.durability * 0.12;
+      // 내구도에 따른 투명도 (1~5 → 0.25~0.65)
+      const fillOpacity = 0.2 + t.durability * 0.09;
 
-      const polyline = L.polyline(latLngs, {
-        color: color,
-        weight: weight,
-        opacity: opacity,
-        smoothFactor: 1,
-        lineCap: "round",
-        lineJoin: "round",
-      });
+      const rect = L.rectangle(
+        [[south, west], [north, east]],
+        {
+          color: color,
+          weight: isMyCrew ? 1.5 : 1,
+          opacity: 0.9,
+          fillColor: color,
+          fillOpacity: fillOpacity,
+        }
+      );
 
-      // Popup with territory info
-      polyline.bindPopup(`
+      rect.bindPopup(`
         <div style="font-size:12px;min-width:120px;">
           <strong>${t.username}</strong><br/>
           ${t.crew_name ? `<span style="color:${color};font-weight:bold;">${t.crew_name}</span><br/>` : ''}
@@ -134,13 +138,13 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
         </div>
       `);
 
-      polyline.addTo(layers);
+      rect.addTo(layers);
     });
 
-    // Fit bounds to show all territories
-    if (allPoints.length > 0) {
-      const bounds = L.latLngBounds(allPoints);
-      mapRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+    // Fit bounds to show all cells
+    if (allBounds.length > 0) {
+      const bounds = L.latLngBounds(allBounds);
+      mapRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
     }
   }, [territories, myUserId, myCrewId]);
 
