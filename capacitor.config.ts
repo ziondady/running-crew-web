@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'fit.run4u.app',
-  appName: '러닝크루',
+  appName: '배틀크루',
   webDir: 'out',
   server: {
     url: 'https://run4u.fit',

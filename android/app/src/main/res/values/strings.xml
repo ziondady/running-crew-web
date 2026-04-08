@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">러닝크루</string>
-    <string name="title_activity_main">러닝크루</string>
+    <string name="app_name">배틀크루</string>
+    <string name="title_activity_main">배틀크루</string>
     <string name="package_name">fit.run4u.app</string>
     <string name="custom_url_scheme">fit.run4u.app</string>
 </resources>

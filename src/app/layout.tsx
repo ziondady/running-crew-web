@@ -10,7 +10,7 @@ export const viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "러닝크루",
+  title: "배틀크루",
   description: "함께 달리고, 함께 성장",
 };
 

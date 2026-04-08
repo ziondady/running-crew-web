@@ -59,7 +59,7 @@ export default function OperatorQR() {
     if (navigator.share) {
       navigator.share({
         title: `${crewName} 크루 가입`,
-        text: "러닝크루에 합류하세요!",
+        text: "배틀크루에 합류하세요!",
         url: joinUrl,
       });
     } else {

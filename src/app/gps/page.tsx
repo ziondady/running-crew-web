@@ -240,7 +240,7 @@ export default function GPSPage() {
       const watcherId = await BackgroundGeolocation.addWatcher(
         {
           backgroundMessage: "러닝 기록 중...",
-          backgroundTitle: "러닝크루",
+          backgroundTitle: "배틀크루",
           requestPermissions: true,
           stale: false,
           distanceFilter: 5,

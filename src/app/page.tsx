@@ -92,8 +92,8 @@ export default function LoginPage() {
       className="w-full min-h-screen flex flex-col items-center justify-center px-6"
       style={{ background: "linear-gradient(160deg, #1A1A2E, #0D1B2A)" }}
     >
-      <div className="text-5xl mb-4">🏃</div>
-      <h1 className="text-white text-2xl font-extrabold mb-1">러닝크루</h1>
+      <div className="text-5xl mb-4">⚔️</div>
+      <h1 className="text-white text-2xl font-extrabold mb-1">배틀크루</h1>
       <p className="text-gray-400 text-sm mb-8">함께 달리고, 함께 성장</p>
 
       <div className="w-full space-y-3">
