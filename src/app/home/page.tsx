@@ -13,6 +13,7 @@ interface RankMember {
   username: string;
   monthly_km: number;
   rank: number;
+  territory_count?: number;
 }
 
 interface ActiveBattle {
@@ -67,7 +68,7 @@ export default function HomePage() {
         if (data.crew) {
           return getCrewRanking(data.crew).then((r) => {
             const list = r.ranking || (Array.isArray(r) ? r : []);
-            setRanking(list.map((m: any) => ({ id: m.id, username: m.username, monthly_km: m.monthly_km, rank: m.rank })));
+            setRanking(list.map((m: any) => ({ id: m.id, username: m.username, monthly_km: m.monthly_km, rank: m.rank, territory_count: m.territory_count || 0 })));
             setLoading(false);
           });
         }
@@ -211,6 +212,7 @@ export default function HomePage() {
                       </span>
                       <span className={`flex-1 font-semibold ${isMe ? "text-[var(--primary)]" : ""}`}>
                         {isMe ? `나 (${m.username})` : m.username}
+                        <span className="text-[9px] text-gray-400 ml-1">🗺️{m.territory_count || 0}</span>
                       </span>
                       <span className={`font-bold ${isMe ? "text-[var(--primary)]" : "text-[var(--dark)]"}`}>
                         {fmtKm(m.monthly_km)}km
