@@ -94,7 +94,7 @@ export default function LoginPage() {
     >
       <div className="text-5xl mb-4">⚔️</div>
       <h1 className="text-white text-2xl font-extrabold mb-1">배틀크루</h1>
-      <p className="text-gray-400 text-sm mb-8">함께 달리고, 함께 성장</p>
+      <p className="text-gray-400 text-sm mb-8">지배할것인가 뒤쳐질것인가 -by ChatGTP</p>
 
       <div className="w-full space-y-3">
         {/* Mode tabs */}
