@@ -3,7 +3,7 @@ import { API_BASE } from "@/lib/api";import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
-import { getStoredUser, AuthUser } from "@/lib/auth";
+import { getStoredUser, saveUser, AuthUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
 
 interface MemberStat {
@@ -35,6 +35,9 @@ export default function OperatorDashboard() {
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>("monthly_km");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [editingName, setEditingName] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const stored = getStoredUser();
@@ -51,6 +54,32 @@ export default function OperatorDashboard() {
   }, [router]);
 
   if (!user) return null;
+
+  const handleSaveName = async () => {
+    if (!user?.crew || !newName.trim()) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/crews/crews/${user.crew}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      if (!res.ok) throw new Error();
+      // Update local state
+      setStats((prev) => prev ? { ...prev, crew_name: newName.trim() } : prev);
+      // Update stored user
+      const stored = getStoredUser();
+      if (stored) {
+        stored.crew_name = newName.trim();
+        saveUser(stored);
+      }
+      setEditingName(false);
+    } catch {
+      alert('크루명 변경에 실패했습니다');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -88,7 +117,41 @@ export default function OperatorDashboard() {
           <>
             {/* 크루 요약 */}
             <div className="rounded-xl p-4 text-white shadow" style={{ background: "linear-gradient(135deg, #1565C0, #1976D2)" }}>
-              <div className="font-bold text-lg">{stats.crew_name}</div>
+              {editingName ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="bg-white/20 border border-white/40 rounded-lg px-2 py-1 text-white text-sm outline-none placeholder:text-white/50 flex-1"
+                    placeholder="새 크루명"
+                    autoFocus
+                  />
+                  <button
+                    onClick={handleSaveName}
+                    disabled={saving || !newName.trim()}
+                    className="bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-lg disabled:opacity-50"
+                  >
+                    {saving ? '...' : '저장'}
+                  </button>
+                  <button
+                    onClick={() => setEditingName(false)}
+                    className="text-white/60 text-xs px-2 py-1.5"
+                  >
+                    취소
+                  </button>
+                </div>
+              ) : (
+                <div className="font-bold text-lg flex items-center gap-2">
+                  {stats.crew_name}
+                  <button
+                    onClick={() => { setNewName(stats.crew_name); setEditingName(true); }}
+                    className="text-xs font-normal bg-white/20 px-2 py-0.5 rounded-lg"
+                  >
+                    ✏️ 수정
+                  </button>
+                </div>
+              )}
               <div className="flex gap-4 mt-3">
                 <div className="text-center">
                   <div className="text-xl font-extrabold">{stats.member_count}</div>
