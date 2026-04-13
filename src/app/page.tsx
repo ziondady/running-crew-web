@@ -100,7 +100,7 @@ export default function LoginPage() {
     >
       <div className="text-5xl mb-4">⚔️</div>
       <h1 className="text-white text-2xl font-extrabold mb-1">배틀크루</h1>
-      <p className="text-gray-400 text-sm mb-8">지배할것인가 뒤쳐질것인가 -by ChatGTP</p>
+      <p className="text-gray-400 text-sm mb-8">지배할것인가 뒤쳐질것인가</p>
 
       <div className="w-full space-y-3">
         {/* Mode tabs */}
@@ -147,7 +147,7 @@ export default function LoginPage() {
         {mode === "register" && (
           <input
             type="email"
-            placeholder="이메일"
+            placeholder="이메일 (비밀번호 찾을때 반드시 필요합니다)"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full bg-white/10 border border-white/20 rounded-xl py-3 px-4 text-white text-base outline-none placeholder:text-gray-500 focus:border-[var(--primary)]"
