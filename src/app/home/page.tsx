@@ -6,6 +6,7 @@ import BattleCard from "@/components/BattleCard";
 import { getCrewRanking, getUserProfile, getUserMonthlyLogs, API_BASE} from "@/lib/api";
 import { getStoredUser, saveUser, AuthUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
+import { saveLocation } from "@/lib/location";
 
 interface RankMember {
   id: number;
@@ -43,6 +44,13 @@ export default function HomePage() {
   useEffect(() => {
     const stored = getStoredUser();
     if (!stored) { router.replace("/"); return; }
+
+    // 현위치 미리 캐싱 (지도/GPS 진입 시 빠른 로딩)
+    navigator.geolocation?.getCurrentPosition(
+      (pos) => saveLocation(pos.coords.latitude, pos.coords.longitude),
+      () => {},
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+    );
 
     // 프로필을 API에서 최신으로 가져옴
     getUserProfile(stored.id)
