@@ -18,6 +18,12 @@ export default function MyPage() {
     notify_battle: true, notify_territory: true, notify_crew: true, notify_ranking: true,
   });
 
+  const [showPwChange, setShowPwChange] = useState(false);
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [pwMessage, setPwMessage] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+
   useEffect(() => {
     const stored = getStoredUser();
     if (!stored) { router.replace("/"); return; }
@@ -202,6 +208,60 @@ export default function MyPage() {
                 </button>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* 비밀번호 변경 */}
+        <button
+          onClick={() => setShowPwChange(!showPwChange)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-white rounded-xl shadow-sm"
+        >
+          <span className="text-sm font-semibold">🔑 비밀번호 변경</span>
+          <span className="text-gray-400 text-xs">{showPwChange ? "▲" : "▼"}</span>
+        </button>
+        {showPwChange && (
+          <div className="bg-white rounded-xl shadow-sm p-4 space-y-2">
+            <input
+              type="password"
+              placeholder="현재 비밀번호"
+              value={currentPw}
+              onChange={(e) => setCurrentPw(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm outline-none"
+            />
+            <input
+              type="password"
+              placeholder="새 비밀번호"
+              value={newPw}
+              onChange={(e) => setNewPw(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg py-2.5 px-3 text-sm outline-none"
+            />
+            {pwMessage && (
+              <p className={`text-xs ${pwMessage.includes('변경') ? 'text-green-500' : 'text-red-500'}`}>{pwMessage}</p>
+            )}
+            <button
+              onClick={async () => {
+                setPwLoading(true);
+                setPwMessage("");
+                try {
+                  const res = await fetch(`${API_BASE}/accounts/password-change/${user.id}/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ current_password: currentPw, new_password: newPw }),
+                  });
+                  const data = await res.json();
+                  setPwMessage(data.message || data.error);
+                  if (res.ok) { setCurrentPw(""); setNewPw(""); }
+                } catch {
+                  setPwMessage("요청 실패");
+                } finally {
+                  setPwLoading(false);
+                }
+              }}
+              disabled={pwLoading || !currentPw || !newPw}
+              className="w-full bg-[var(--primary)] text-white rounded-lg py-2.5 text-sm font-bold disabled:opacity-50"
+            >
+              {pwLoading ? '변경 중...' : '비밀번호 변경'}
+            </button>
           </div>
         )}
 

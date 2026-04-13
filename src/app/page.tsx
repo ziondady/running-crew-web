@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { register, login } from "@/lib/api";
+import { register, login, API_BASE } from "@/lib/api";
 import { saveUser, getStoredUser } from "@/lib/auth";
 
 export default function LoginPage() {
@@ -13,6 +13,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const [showReset, setShowReset] = useState(false);
+  const [resetUsername, setResetUsername] = useState("");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState("");
 
   const [pendingToken, setPendingToken] = useState<string | null>(null);
 
@@ -174,6 +180,15 @@ export default function LoginPage() {
           {loading ? "처리 중..." : mode === "register" ? "회원가입" : "로그인"}
         </button>
 
+        {mode === "login" && (
+          <button
+            onClick={() => setShowReset(true)}
+            className="text-xs text-gray-400 underline text-right w-full"
+          >
+            비밀번호를 잊으셨나요?
+          </button>
+        )}
+
         {/* Divider */}
         <div className="flex items-center gap-3 py-2">
           <div className="flex-1 h-px bg-white/10" />
@@ -204,6 +219,63 @@ export default function LoginPage() {
       <p className="text-gray-500 text-xs mt-4 text-center">
         가입 시 이용약관 및 개인정보처리방침에 동의합니다
       </p>
+
+      {showReset && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center px-6">
+          <div className="bg-[#1A1A2E] rounded-2xl p-6 w-full max-w-sm space-y-3">
+            <h2 className="text-white text-lg font-bold text-center">비밀번호 찾기</h2>
+            <p className="text-gray-400 text-xs text-center">가입 시 입력한 아이디와 이메일을 입력하세요</p>
+            <input
+              type="text"
+              placeholder="아이디"
+              value={resetUsername}
+              onChange={(e) => setResetUsername(e.target.value)}
+              className="w-full bg-white/10 border border-white/20 rounded-xl py-3 px-4 text-white text-base outline-none placeholder:text-gray-500"
+            />
+            <input
+              type="email"
+              placeholder="이메일"
+              value={resetEmail}
+              onChange={(e) => setResetEmail(e.target.value)}
+              className="w-full bg-white/10 border border-white/20 rounded-xl py-3 px-4 text-white text-base outline-none placeholder:text-gray-500"
+            />
+            {resetMessage && (
+              <p className={`text-xs text-center ${resetMessage.includes('발송') ? 'text-green-400' : 'text-red-400'}`}>
+                {resetMessage}
+              </p>
+            )}
+            <button
+              onClick={async () => {
+                setResetLoading(true);
+                setResetMessage("");
+                try {
+                  const res = await fetch(`${API_BASE}/accounts/password-reset/`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: resetUsername, email: resetEmail }),
+                  });
+                  const data = await res.json();
+                  setResetMessage(data.message || data.error || '요청 실패');
+                } catch {
+                  setResetMessage('요청에 실패했습니다');
+                } finally {
+                  setResetLoading(false);
+                }
+              }}
+              disabled={resetLoading || !resetUsername || !resetEmail}
+              className="w-full bg-[var(--primary)] rounded-xl py-3 text-white text-sm font-bold disabled:opacity-50"
+            >
+              {resetLoading ? '발송 중...' : '임시 비밀번호 발송'}
+            </button>
+            <button
+              onClick={() => { setShowReset(false); setResetMessage(""); }}
+              className="w-full text-gray-400 text-xs py-2"
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
