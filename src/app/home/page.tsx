@@ -78,7 +78,7 @@ export default function HomePage() {
       </div>
 
       <div className="p-4 space-y-3">
-        <p className="text-xs text-gray-400">3월 나의 기록</p>
+        <p className="text-xs text-gray-400">{new Date().getMonth() + 1}월 나의 기록</p>
 
         {/* Stat card */}
         <div
