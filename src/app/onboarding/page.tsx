@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getStoredUser } from "@/lib/auth";
+import { getStoredUser, saveUser } from "@/lib/auth";
+import { API_BASE } from "@/lib/api";
 
 export default function OnboardingPage() {
   const router = useRouter();
   const [username, setUsername] = useState("");
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     const user = getStoredUser();
@@ -13,6 +15,31 @@ export default function OnboardingPage() {
     if (user.crew) { router.replace("/home"); return; }
     setUsername(user.username);
   }, [router]);
+
+  const handleSoloCrew = async () => {
+    const user = getStoredUser();
+    if (!user) return;
+    setCreating(true);
+    try {
+      const res = await fetch(`${API_BASE}/crews/solo/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id }),
+      });
+      if (!res.ok) throw new Error('크루 생성 실패');
+      const data = await res.json();
+
+      // Update stored user with new crew info
+      const updatedUser = { ...user, crew: data.id, crew_name: data.name };
+      saveUser(updatedUser);
+
+      router.replace('/home');
+    } catch (err) {
+      alert('크루 생성에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setCreating(false);
+    }
+  };
 
   return (
     <div
@@ -51,11 +78,15 @@ export default function OnboardingPage() {
       </button>
 
       <button
-        onClick={() => router.push("/home")}
-        className="text-gray-500 text-xs mt-6 underline"
+        onClick={handleSoloCrew}
+        disabled={creating}
+        className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl py-4 text-base font-bold shadow-lg active:scale-95 transition-transform disabled:opacity-50 mt-3"
       >
-        나중에 설정할 수도 있어요
+        {creating ? '크루 생성 중...' : '⚡ 나만의 크루로 시작'}
       </button>
+      <p className="text-gray-500 text-xs text-center mt-1">
+        혼자서도 바로 점령전에 참여할 수 있어요
+      </p>
     </div>
   );
 }
