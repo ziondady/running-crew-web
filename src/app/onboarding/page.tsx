@@ -50,43 +50,32 @@ export default function OnboardingPage() {
       <h2 className="text-white text-xl font-extrabold mb-1">환영해요!</h2>
       <p className="text-gray-400 text-sm mb-1">{username}님</p>
       <p className="text-gray-500 text-xs mb-8 text-center">
-        크루에 참여하거나 새 크루를 만들어보세요
+        크루를 만들거나 QR로 가입하세요
       </p>
 
       <button
-        onClick={() => router.push("/create-crew")}
-        className="w-full rounded-2xl p-5 mb-3 text-left active:scale-95 transition-transform"
-        style={{ background: "linear-gradient(135deg, #FF5722, #FF8A65)" }}
+        onClick={handleSoloCrew}
+        disabled={creating}
+        className="w-full rounded-2xl p-5 mb-2 text-left active:scale-95 transition-transform disabled:opacity-50"
+        style={{ background: "linear-gradient(135deg, #7C3AED, #4F46E5)" }}
       >
-        <div className="text-white text-base font-extrabold mb-1">🏃 새 크루 만들기</div>
+        <div className="text-white text-base font-extrabold mb-1">⚡ 나만의 크루 만들기</div>
         <div className="text-white/80 text-xs leading-relaxed">
-          내가 운영자가 되어 크루를 개설합니다<br />
-          개설 후 QR로 멤버를 초대할 수 있어요
+          {creating ? '크루 생성 중...' : '1인 크루도 점령전에 바로 참여할 수 있어요!'}
         </div>
       </button>
 
       <button
         onClick={() => router.push("/home")}
-        className="w-full rounded-2xl p-5 text-left active:scale-95 transition-transform"
+        className="w-full rounded-2xl p-4 text-left active:scale-95 transition-transform mt-2"
         style={{
           background: "rgba(255,255,255,0.08)",
           border: "1px solid rgba(255,255,255,0.15)",
         }}
       >
-        <div className="text-white text-base font-extrabold mb-1">📷 QR로 크루 가입</div>
+        <div className="text-white text-sm font-bold mb-0.5">📷 QR로 크루 가입</div>
         <div className="text-white/50 text-xs">운영자에게 QR코드를 받아 스캔하세요</div>
       </button>
-
-      <button
-        onClick={handleSoloCrew}
-        disabled={creating}
-        className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-2xl py-4 text-base font-bold shadow-lg active:scale-95 transition-transform disabled:opacity-50 mt-3"
-      >
-        {creating ? '크루 생성 중...' : '⚡ 나만의 크루로 시작'}
-      </button>
-      <p className="text-gray-500 text-xs text-center mt-1">
-        혼자서도 바로 점령전에 참여할 수 있어요
-      </p>
     </div>
   );
 }
