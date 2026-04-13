@@ -4,6 +4,7 @@ import { API_BASE } from "@/lib/api";import { useEffect, useState } from "react"
 interface CrewRankItem {
   id: number;
   name: string;
+  total_km: number;
   wins: number;
   losses: number;
   battle_points: number;
@@ -87,7 +88,8 @@ export default function CrewRanking({ myCrewId }: { myCrewId?: number | null }) 
               </span>
               <div className="flex-1 min-w-0">
                 <div className={`text-sm font-semibold truncate ${isMyCrew ? "text-[var(--primary)]" : ""}`}>
-                  {isMyCrew ? `${crew.name} (내 크루)` : crew.name}
+                  <span>{isMyCrew ? `${crew.name} (내 크루)` : crew.name}</span>
+                  <span className="text-[10px] text-gray-400 ml-1 font-normal">{Math.floor(crew.total_km).toLocaleString()}km</span>
                 </div>
                 <div className="text-[10px] text-gray-400 mt-0.5">
                   <span className="text-blue-600">{crew.wins}승</span>
