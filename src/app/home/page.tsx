@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import BattleCard from "@/components/BattleCard";
-import { getCrewRanking, getUserProfile ,API_BASE} from "@/lib/api";
+import { getCrewRanking, getUserProfile, getUserMonthlyLogs, API_BASE} from "@/lib/api";
 import { getStoredUser, saveUser, AuthUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
 
@@ -36,6 +36,9 @@ export default function HomePage() {
   const [ranking, setRanking] = useState<RankMember[]>([]);
   const [activeBattles, setActiveBattles] = useState<ActiveBattle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedUserId, setExpandedUserId] = useState<number | null>(null);
+  const [detailLogs, setDetailLogs] = useState<any[]>([]);
+  const [detailLoading, setDetailLoading] = useState(false);
 
   useEffect(() => {
     const stored = getStoredUser();
@@ -64,6 +67,24 @@ export default function HomePage() {
       })
       .catch(() => { setMe(stored); setLoading(false); });
   }, [router]);
+
+  const handleRowClick = async (userId: number) => {
+    if (expandedUserId === userId) {
+      setExpandedUserId(null);
+      return;
+    }
+    setExpandedUserId(userId);
+    setDetailLoading(true);
+    try {
+      const now = new Date();
+      const logs = await getUserMonthlyLogs(userId, now.getFullYear(), now.getMonth() + 1);
+      setDetailLogs(Array.isArray(logs) ? logs : []);
+    } catch {
+      setDetailLogs([]);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
 
   if (!me) return null;
 
@@ -168,21 +189,54 @@ export default function HomePage() {
               {ranking.slice(0, 5).map((m) => {
                 const isMe = m.id === me.id;
                 const medal = m.rank === 1 ? "🥇" : m.rank === 2 ? "🥈" : m.rank === 3 ? "🥉" : "";
+                const isExpanded = expandedUserId === m.id;
                 return (
-                  <div
-                    key={m.id}
-                    className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm shadow-sm ${
-                      isMe ? "bg-orange-50 border border-orange-200" : "bg-white"
-                    }`}
-                  >
-                    <span className="font-extrabold text-[var(--primary)] w-5">{m.rank}</span>
-                    {medal && <span>{medal}</span>}
-                    <span className={`flex-1 font-semibold ${isMe ? "text-[var(--primary)]" : ""}`}>
-                      {isMe ? `나 (${m.username})` : m.username}
-                    </span>
-                    <span className={`font-bold ${isMe ? "text-[var(--primary)]" : "text-[var(--dark)]"}`}>
-                      {fmtKm(m.monthly_km)}km
-                    </span>
+                  <div key={m.id}>
+                    <div
+                      onClick={() => handleRowClick(m.id)}
+                      className={`flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm shadow-sm cursor-pointer active:scale-[0.98] transition-transform ${
+                        isMe ? "bg-orange-50 border border-orange-200" : "bg-white"
+                      } ${isExpanded ? "rounded-b-none" : ""}`}
+                    >
+                      <span className="font-extrabold text-[var(--primary)] w-5">
+                        {medal || m.rank}
+                      </span>
+                      <span className={`flex-1 font-semibold ${isMe ? "text-[var(--primary)]" : ""}`}>
+                        {isMe ? `나 (${m.username})` : m.username}
+                      </span>
+                      <span className={`font-bold ${isMe ? "text-[var(--primary)]" : "text-[var(--dark)]"}`}>
+                        {fmtKm(m.monthly_km)}km
+                      </span>
+                      <span className={`text-[10px] text-gray-300 transition-transform ${isExpanded ? "rotate-180" : ""}`}>▼</span>
+                    </div>
+                    {isExpanded && (
+                      <div className={`rounded-b-lg px-3 py-2 border-t ${isMe ? "bg-orange-50/50 border-orange-200" : "bg-gray-50 border-gray-100"}`}>
+                        {detailLoading ? (
+                          <div className="text-[10px] text-gray-400 text-center py-2">로딩 중...</div>
+                        ) : detailLogs.length === 0 ? (
+                          <div className="text-[10px] text-gray-400 text-center py-2">기록 없음</div>
+                        ) : (
+                          <div className="space-y-1">
+                            {detailLogs.map((log: any) => (
+                              <div key={log.id} className="flex items-center gap-2 text-[11px]">
+                                <span className="text-gray-400 shrink-0">{log.date?.slice(5)} {log.created_at}</span>
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                  log.source_key === 'manual' ? 'bg-yellow-100 text-yellow-700' :
+                                  log.source_key === 'gps' ? 'bg-green-100 text-green-700' :
+                                  'bg-blue-100 text-blue-700'
+                                }`}>{log.source}</span>
+                                <span className="flex-1 text-gray-500">
+                                  {log.distance !== log.buff_distance
+                                    ? `${fmtKm(log.distance)}km → ${fmtKm(log.buff_distance)}km`
+                                    : `${fmtKm(log.buff_distance)}km`}
+                                </span>
+                                {log.is_offline_meetup && <span className="text-[9px]">🏃오프벙</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
