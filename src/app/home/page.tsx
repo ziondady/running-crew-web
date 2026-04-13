@@ -72,7 +72,7 @@ export default function HomePage() {
   return (
     <AppShell>
       {/* Top bar */}
-      <div className="w-full bg-[var(--dark)] text-white px-4 py-3 text-sm font-bold flex items-center gap-2">
+      <div className="w-full bg-[var(--dark)] text-white px-4 py-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] text-sm font-bold flex items-center gap-2">
         <span className="flex-1">⚔️ 배틀크루</span>
         <button onClick={() => router.push("/mypage")} className="opacity-80 text-lg">⚙️</button>
       </div>
