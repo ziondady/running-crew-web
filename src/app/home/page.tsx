@@ -186,7 +186,7 @@ export default function HomePage() {
             <div className="text-center text-gray-400 text-sm py-4">아직 기록이 없습니다</div>
           ) : (
             <div className="space-y-1.5">
-              {ranking.slice(0, 5).map((m) => {
+              {ranking.filter((m) => m.monthly_km > 0).map((m) => {
                 const isMe = m.id === me.id;
                 const medal = m.rank === 1 ? "🥇" : m.rank === 2 ? "🥈" : m.rank === 3 ? "🥉" : "";
                 const isExpanded = expandedUserId === m.id;
