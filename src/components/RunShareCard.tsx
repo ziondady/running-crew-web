@@ -1,6 +1,5 @@
 "use client";
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 
 interface RunShareCardProps {
   distance: number;
@@ -195,19 +194,20 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
     return () => clearTimeout(timer);
   }, [drawCard]);
 
-  const handleBgSelect = async () => {
-    try {
-      const photo = await Camera.getPhoto({
-        resultType: CameraResultType.DataUrl,
-        source: CameraSource.Photos,
-        quality: 90,
-      });
-      if (photo.dataUrl) {
-        setBgImage(photo.dataUrl);
-      }
-    } catch {
-      // User cancelled
-    }
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBgSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setBgImage(ev.target?.result as string);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = async () => {
@@ -277,6 +277,13 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
         >
           📷 사진 선택
         </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="hidden"
+        />
       </div>
     </div>
   );
