@@ -15,8 +15,21 @@ interface TerritoryItem {
   path_data: { lat: number; lng: number }[];
 }
 
+interface CellItem {
+  id: number;
+  cell_key: string;
+  user: number;
+  username: string;
+  user_color: string;
+  crew_id: number | null;
+  crew_name: string | null;
+  durability: number;
+  bounds: { south: number; north: number; west: number; east: number };
+}
+
 interface TerritoryMapProps {
   territories: TerritoryItem[];
+  cells: CellItem[];
   myUserId?: number;
   myCrewId?: number | null;
 }
@@ -27,7 +40,7 @@ const CREW_COLORS = [
   "#AD1457", "#283593", "#558B2F", "#6A1B9A", "#D84315",
 ];
 
-export default function TerritoryMap({ territories, myUserId, myCrewId }: TerritoryMapProps) {
+export default function TerritoryMap({ territories, cells, myUserId, myCrewId }: TerritoryMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const layersRef = useRef<L.LayerGroup | null>(null);
@@ -81,16 +94,18 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
     const layers = layersRef.current;
     layers.clearLayers();
 
-    if (territories.length === 0) return;
+    if (territories.length === 0 && cells.length === 0) return;
 
-    // Build crew color map
+    // Build crew color map (include both territory and cell crew IDs)
     const crewIds = [...new Set(territories.map(t => t.crew_id).filter(Boolean))] as number[];
+    const cellCrewIds = [...new Set(cells.map(c => c.crew_id).filter(Boolean))] as number[];
+    const allCrewIds = [...new Set([...crewIds, ...cellCrewIds])];
     const crewColorMap: Record<number, string> = {};
     if (myCrewId) {
       crewColorMap[myCrewId] = CREW_COLORS[0];
     }
     let colorIdx = 1;
-    crewIds.forEach(cid => {
+    allCrewIds.forEach(cid => {
       if (!crewColorMap[cid]) {
         crewColorMap[cid] = CREW_COLORS[colorIdx % CREW_COLORS.length];
         colorIdx++;
@@ -98,6 +113,37 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
     });
 
     const allBounds: [number, number][] = [];
+
+    // Draw cells first (underneath)
+    cells.forEach((cell) => {
+      const { south, west, north, east } = cell.bounds;
+      const isMyCrew = cell.crew_id === myCrewId;
+      const color = cell.crew_id ? (crewColorMap[cell.crew_id] || "#999") : (cell.user_color || "#999");
+      const fillOpacity = 0.15 + cell.durability * 0.05;
+
+      const rect = L.rectangle(
+        [[south, west], [north, east]],
+        {
+          color: color,
+          weight: 0.5,
+          opacity: 0.3,
+          fillColor: color,
+          fillOpacity: fillOpacity,
+        }
+      );
+
+      rect.bindPopup(`
+        <div style="font-size:12px;min-width:100px;">
+          <strong>${cell.username}</strong><br/>
+          ${cell.crew_name ? `<span style="color:${color};font-weight:bold;">${cell.crew_name}</span><br/>` : ''}
+          내구도: Lv.${cell.durability}
+          ${isMyCrew ? '<br/><span style="color:#FF5722;font-size:10px;">내 크루</span>' : ''}
+        </div>
+      `);
+
+      rect.addTo(layers);
+      allBounds.push([south, west], [north, east]);
+    });
 
     // 시작점과 끝점이 가까우면(100m 이내) 폐합 경로로 판단
     function isClosed(pts: [number, number][]): boolean {
@@ -109,6 +155,7 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
       return Math.sqrt(dLat * dLat + dLng * dLng) < 100;
     }
 
+    // Then draw territories (polylines/polygons) on top
     territories.forEach((t) => {
       if (!t.path_data || t.path_data.length < 2) return;
 
@@ -166,7 +213,7 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
       const bounds = L.latLngBounds(allBounds);
       mapRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
     }
-  }, [territories, myUserId, myCrewId]);
+  }, [territories, cells, myUserId, myCrewId]);
 
   return (
     <div ref={containerRef} className="w-full rounded-xl overflow-hidden" style={{ height: "55vh", background: "#e8e8e8" }} />

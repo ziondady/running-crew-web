@@ -147,3 +147,7 @@ export async function getTerritoryLogs(userId?: number) {
   const data = await fetchAPI(`/territory/territory-logs/${query}`);
   return data.results;
 }
+
+export async function getTerritoryCells() {
+  return fetchAPI('/territory/cells/');
+}

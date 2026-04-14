@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
-import { getTerritories, getTerritoryRanking, getTerritoryLogs } from "@/lib/api";
+import { getTerritories, getTerritoryRanking, getTerritoryLogs, getTerritoryCells } from "@/lib/api";
 import { getStoredUser, AuthUser } from "@/lib/auth";
 
 const TerritoryMap = dynamic(() => import("@/components/TerritoryMap"), { ssr: false });
@@ -18,6 +18,18 @@ interface TerritoryItem {
   durability: number;
   path_data: { lat: number; lng: number }[];
   last_run_at: string;
+}
+
+interface CellItem {
+  id: number;
+  cell_key: string;
+  user: number;
+  username: string;
+  user_color: string;
+  crew_id: number | null;
+  crew_name: string | null;
+  durability: number;
+  bounds: { south: number; north: number; west: number; east: number };
 }
 
 interface RankItem {
@@ -41,6 +53,7 @@ interface LogItem {
 export default function TerritoryPage() {
   const [tab, setTab] = useState<"map" | "detail" | "alert">("map");
   const [territories, setTerritories] = useState<TerritoryItem[]>([]);
+  const [cells, setCells] = useState<CellItem[]>([]);
   const [myTerritories, setMyTerritories] = useState<TerritoryItem[]>([]);
   const [ranking, setRanking] = useState<RankItem[]>([]);
   const [logs, setLogs] = useState<LogItem[]>([]);
@@ -56,12 +69,14 @@ export default function TerritoryPage() {
       getTerritories().catch(() => []),
       getTerritoryRanking().catch(() => []),
       getTerritoryLogs(stored?.id).catch(() => []),
-    ]).then(([allT, rank, logData]) => {
+      getTerritoryCells().catch(() => []),
+    ]).then(([allT, rank, logData, cellData]) => {
       const tList = Array.isArray(allT) ? allT : allT.results ?? [];
       setTerritories(tList);
       setMyTerritories(tList.filter((t: TerritoryItem) => t.user === stored?.id));
       setRanking(Array.isArray(rank) ? rank : rank.results ?? []);
       setLogs(logData);
+      setCells(Array.isArray(cellData) ? cellData : cellData.results ?? []);
       setLoading(false);
     });
   }, []);
@@ -120,7 +135,7 @@ export default function TerritoryPage() {
         {!loading && tab === "map" && (
           <>
             {/* Leaflet Map */}
-            <TerritoryMap territories={territories} myUserId={me?.id} myCrewId={me?.crew} />
+            <TerritoryMap territories={territories} cells={cells} myUserId={me?.id} myCrewId={me?.crew} />
 
             {/* Legend */}
             <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
@@ -161,8 +176,8 @@ export default function TerritoryPage() {
                 <div className="text-[10px] text-gray-400">내 점령 경로</div>
               </div>
               <div className="flex-1 bg-green-50 rounded-lg p-3 text-center">
-                <div className="text-lg font-extrabold text-green-600">{territories.length}개</div>
-                <div className="text-[10px] text-gray-400">전체 경로</div>
+                <div className="text-lg font-extrabold text-green-600">{territories.length + cells.length}개</div>
+                <div className="text-[10px] text-gray-400">전체 경로+셀</div>
               </div>
               <div className="flex-1 bg-blue-50 rounded-lg p-3 text-center">
                 <div className="text-lg font-extrabold text-[var(--op)]">{myRankEntry?.rank || "-"}위</div>
