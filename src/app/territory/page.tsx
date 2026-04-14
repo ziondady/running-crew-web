@@ -179,10 +179,6 @@ export default function TerritoryPage() {
                   <div className="text-xl font-extrabold">{myRankEntry?.rank || "-"}</div>
                   <div className="text-[9px] opacity-80">전체 크루 순위</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-xl font-extrabold">{durDist.find((d) => d.lv === 5)?.count || 0}</div>
-                  <div className="text-[9px] opacity-80">Lv.5 셀</div>
-                </div>
               </div>
             </div>
 
