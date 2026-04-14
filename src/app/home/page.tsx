@@ -47,11 +47,6 @@ export default function HomePage() {
     if (!stored) { router.replace("/"); return; }
 
     // 현위치 미리 캐싱 (지도/GPS 진입 시 빠른 로딩)
-    navigator.geolocation?.getCurrentPosition(
-      (pos) => saveLocation(pos.coords.latitude, pos.coords.longitude),
-      () => {},
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
-    );
 
     // 프로필을 API에서 최신으로 가져옴
     getUserProfile(stored.id)
@@ -76,6 +71,22 @@ export default function HomePage() {
       })
       .catch(() => { setMe(stored); setLoading(false); });
   }, [router]);
+
+  // GPS 워밍업 (30초간 위치 추적 후 자동 해제)
+  useEffect(() => {
+    const warmupId = navigator.geolocation?.watchPosition(
+      (pos) => saveLocation(pos.coords.latitude, pos.coords.longitude),
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+    const timer = setTimeout(() => {
+      if (warmupId !== undefined) navigator.geolocation?.clearWatch(warmupId);
+    }, 30000);
+    return () => {
+      if (warmupId !== undefined) navigator.geolocation?.clearWatch(warmupId);
+      clearTimeout(timer);
+    };
+  }, []);
 
   const handleRowClick = async (userId: number) => {
     if (expandedUserId === userId) {

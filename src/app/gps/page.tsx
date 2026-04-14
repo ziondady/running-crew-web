@@ -445,7 +445,8 @@ export default function GPSPage() {
     startTracking();
   }, [startTracking]);
 
-  const handleStart = useCallback(async () => {
+  const startWithCountdown = useCallback(async () => {
+    setGpsNotReady(false);
     setCountdown(3);
     await new Promise(r => setTimeout(r, 1000));
     setCountdown(2);
@@ -453,7 +454,12 @@ export default function GPSPage() {
     setCountdown(1);
     await new Promise(r => setTimeout(r, 1000));
     setCountdown(null);
+    startTracking();
+  }, [startTracking]);
 
+  const handleStart = useCallback(async () => {
+    // 1. GPS 체크 먼저
+    let gpsReady = false;
     try {
       await new Promise<void>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(
@@ -462,11 +468,20 @@ export default function GPSPage() {
           { enableHighAccuracy: true, timeout: 2000, maximumAge: 0 }
         );
       });
-      startTracking();
+      gpsReady = true;
     } catch {
-      setGpsNotReady(true);
+      gpsReady = false;
     }
-  }, [startTracking]);
+
+    if (!gpsReady) {
+      // GPS 안 잡힘 - 진행 여부 확인
+      setGpsNotReady(true);
+      return;
+    }
+
+    // GPS 잡힘 - 카운트다운 후 시작
+    await startWithCountdown();
+  }, [startWithCountdown]);
 
   stopTracking = useCallback(async () => {
     await stopAllWatchers();
@@ -571,6 +586,8 @@ export default function GPSPage() {
 
       // 앱 복귀 시 (visible) 러닝 중이면 Wake Lock 재획득 + GPS 재시작
       if (document.visibilityState === "visible" && statusRef.current === "running") {
+        // 앱 복귀 시 타이머 즉시 갱신 (백그라운드에서 interval이 throttle됐을 수 있음)
+        setElapsed(Math.floor((Date.now() - startTimeRef.current) / 1000));
         requestWakeLock();
         // GPS가 끊겼을 수 있으므로 watcher 재시작
         const gap = Date.now() - lastGpsTimeRef.current;
@@ -769,7 +786,7 @@ export default function GPSPage() {
                 기다릴게요
               </button>
               <button
-                onClick={() => { setGpsNotReady(false); startTracking(); }}
+                onClick={() => { startWithCountdown(); }}
                 className="flex-1 bg-green-500 text-white rounded-xl py-3 text-sm font-bold"
               >
                 일단 시작
