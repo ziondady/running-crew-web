@@ -242,7 +242,7 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
   return (
     <div className="fixed inset-0 z-[5000] bg-black flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}>
+      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ paddingTop: "max(env(safe-area-inset-top, 0px) + 12px, 48px)" }}>
         <button onClick={onClose} className="text-white text-sm">✕ 닫기</button>
         <span className="text-white text-sm font-bold">러닝 공유</span>
         <button
