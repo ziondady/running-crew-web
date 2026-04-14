@@ -99,6 +99,16 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
 
     const allBounds: [number, number][] = [];
 
+    // 시작점과 끝점이 가까우면(50m 이내) 폐합 경로로 판단
+    function isClosed(pts: [number, number][]): boolean {
+      if (pts.length < 10) return false;
+      const first = pts[0];
+      const last = pts[pts.length - 1];
+      const dLat = (first[0] - last[0]) * 111320;
+      const dLng = (first[1] - last[1]) * 111320 * Math.cos(first[0] * Math.PI / 180);
+      return Math.sqrt(dLat * dLat + dLng * dLng) < 50;
+    }
+
     territories.forEach((t) => {
       if (!t.path_data || t.path_data.length < 2) return;
 
@@ -108,33 +118,44 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
       const fillOpacity = 0.3 + t.durability * 0.1;
       const weight = 8 + t.durability * 2;
 
-      // Thick semi-transparent corridor
-      const corridor = L.polyline(latLngs, {
-        color: color,
-        weight: weight,
-        opacity: fillOpacity,
-        lineCap: 'round',
-        lineJoin: 'round',
-      });
-
-      // Thin solid route line on top
-      const route = L.polyline(latLngs, {
-        color: color,
-        weight: 2,
-        opacity: 0.8,
-      });
-
-      corridor.bindPopup(`
+      const popupHtml = `
         <div style="font-size:12px;min-width:120px;">
           <strong>${t.username}</strong><br/>
           ${t.crew_name ? `<span style="color:${color};font-weight:bold;">${t.crew_name}</span><br/>` : ''}
           내구도: Lv.${t.durability}
           ${isMyCrew ? '<br/><span style="color:#FF5722;font-size:10px;">내 크루</span>' : ''}
         </div>
-      `);
+      `;
 
-      corridor.addTo(layers);
-      route.addTo(layers);
+      if (isClosed(latLngs)) {
+        // 폐합 경로 → 폴리곤 (면적 채움)
+        const polygon = L.polygon(latLngs, {
+          color: color,
+          weight: 2,
+          opacity: 0.8,
+          fillColor: color,
+          fillOpacity: fillOpacity,
+        });
+        polygon.bindPopup(popupHtml);
+        polygon.addTo(layers);
+      } else {
+        // 개방 경로 → 폴리라인 (코리더)
+        const corridor = L.polyline(latLngs, {
+          color: color,
+          weight: weight,
+          opacity: fillOpacity,
+          lineCap: 'round',
+          lineJoin: 'round',
+        });
+        const route = L.polyline(latLngs, {
+          color: color,
+          weight: 2,
+          opacity: 0.8,
+        });
+        corridor.bindPopup(popupHtml);
+        corridor.addTo(layers);
+        route.addTo(layers);
+      }
 
       // Collect bounds
       latLngs.forEach(ll => allBounds.push(ll));
