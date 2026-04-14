@@ -90,6 +90,7 @@ export default function TerritoryPage() {
     count: myTerritories.filter((t) => t.durability === lv).length,
   }));
   const durColors: Record<number, string> = { 5: "#1B5E20", 4: "#2E7D32", 3: "#43A047", 2: "#66BB6A", 1: "#A5D6A7" };
+  const now = Date.now();
 
   const actionLabels: Record<string, { label: string; color: string; border: string }> = {
     claim: { label: "🎉 신규 셀 점령!", color: "text-green-600", border: "border-green-500" },
