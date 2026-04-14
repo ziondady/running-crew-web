@@ -4,14 +4,11 @@ import { API_BASE } from "@/lib/api";
 
 const APP_VERSION = "1.0.0";
 
-function compareVersions(current: string, minimum: string): boolean {
-  const c = current.split('.').map(Number);
-  const m = minimum.split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((c[i] || 0) < (m[i] || 0)) return true;
-    if ((c[i] || 0) > (m[i] || 0)) return false;
-  }
-  return false;
+function needsForceUpdate(current: string, minimum: string): boolean {
+  // 메이저 버전(첫째 자리)이 올라갔을 때만 강제 업데이트
+  const cMajor = Number(current.split('.')[0]) || 0;
+  const mMajor = Number(minimum.split('.')[0]) || 0;
+  return cMajor < mMajor;
 }
 
 export default function VersionCheck() {
@@ -23,7 +20,7 @@ export default function VersionCheck() {
     fetch(`${API_BASE}/accounts/app-version/`, { cache: "no-store" })
       .then((r) => r.json())
       .then((data) => {
-        if (data.min_version && compareVersions(APP_VERSION, data.min_version)) {
+        if (data.min_version && needsForceUpdate(APP_VERSION, data.min_version)) {
           setNeedsUpdate(true);
           setDownloadUrl(data.download_url || "");
           setMessage(data.update_message || "새로운 버전이 출시되었습니다.");
