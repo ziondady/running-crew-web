@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getCachedLocation } from "@/lib/location";
@@ -41,6 +41,7 @@ const CREW_COLORS = [
 ];
 
 export default function TerritoryMap({ territories, cells, myUserId, myCrewId }: TerritoryMapProps) {
+  const [filter, setFilter] = useState<"all" | "my" | "crew">("all");
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const layersRef = useRef<L.LayerGroup | null>(null);
@@ -94,7 +95,13 @@ export default function TerritoryMap({ territories, cells, myUserId, myCrewId }:
     const layers = layersRef.current;
     layers.clearLayers();
 
-    if (territories.length === 0 && cells.length === 0) return;
+    const filteredCells = filter === "all" ? cells
+      : filter === "my" ? cells.filter(c => c.user === myUserId)
+      : cells.filter(c => c.crew_id === myCrewId);
+
+    const filteredTerritories = filter === "all" ? territories
+      : filter === "my" ? territories.filter(t => t.user === myUserId)
+      : territories.filter(t => t.crew_id === myCrewId);
 
     // Build crew color map (include both territory and cell crew IDs)
     const crewIds = [...new Set(territories.map(t => t.crew_id).filter(Boolean))] as number[];
@@ -115,11 +122,11 @@ export default function TerritoryMap({ territories, cells, myUserId, myCrewId }:
     const allBounds: [number, number][] = [];
 
     // Draw cells first (underneath)
-    cells.forEach((cell) => {
+    filteredCells.forEach((cell) => {
       const { south, west, north, east } = cell.bounds;
       const isMyCrew = cell.crew_id === myCrewId;
       const color = cell.crew_id ? (crewColorMap[cell.crew_id] || "#999") : (cell.user_color || "#999");
-      const fillOpacity = 0.15 + cell.durability * 0.05;
+      const fillOpacity = 0.25 + cell.durability * 0.08;
 
       const rect = L.rectangle(
         [[south, west], [north, east]],
@@ -175,7 +182,7 @@ export default function TerritoryMap({ territories, cells, myUserId, myCrewId }:
     updateLabels();
 
     // Draw territory routes as thin lines on top
-    territories.forEach((t) => {
+    filteredTerritories.forEach((t) => {
       if (!t.path_data || t.path_data.length < 2) return;
 
       const latLngs = t.path_data.map(p => [p.lat, p.lng] as [number, number]);
@@ -206,9 +213,37 @@ export default function TerritoryMap({ territories, cells, myUserId, myCrewId }:
       const bounds = L.latLngBounds(allBounds);
       mapRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
     }
-  }, [territories, cells, myUserId, myCrewId]);
+  }, [territories, cells, myUserId, myCrewId, filter]);
 
   return (
-    <div ref={containerRef} className="w-full rounded-xl overflow-hidden" style={{ height: "55vh", background: "#e8e8e8" }} />
+    <div className="relative">
+      <div ref={containerRef} className="w-full rounded-xl overflow-hidden" style={{ height: "55vh", background: "#e8e8e8" }} />
+      <div className="absolute top-3 left-3 z-[1000] flex gap-1">
+        <button
+          onClick={() => setFilter("all")}
+          className={`px-3 py-1.5 rounded-full text-[11px] font-bold shadow-md transition-all ${
+            filter === "all" ? "bg-white text-gray-800" : "bg-black/40 text-white"
+          }`}
+        >
+          전체
+        </button>
+        <button
+          onClick={() => setFilter("crew")}
+          className={`px-3 py-1.5 rounded-full text-[11px] font-bold shadow-md transition-all ${
+            filter === "crew" ? "bg-white text-gray-800" : "bg-black/40 text-white"
+          }`}
+        >
+          내 크루
+        </button>
+        <button
+          onClick={() => setFilter("my")}
+          className={`px-3 py-1.5 rounded-full text-[11px] font-bold shadow-md transition-all ${
+            filter === "my" ? "bg-white text-gray-800" : "bg-black/40 text-white"
+          }`}
+        >
+          내 영역
+        </button>
+      </div>
+    </div>
   );
 }
