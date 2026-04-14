@@ -583,9 +583,31 @@ export default function GPSPage() {
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [saveSession, requestWakeLock, restartWatcher]);
 
+  // 최신 state를 ref로 추적 (unmount cleanup에서 접근용)
+  const pointsRef = useRef(points);
+  const distanceRef = useRef(distance);
+  const elapsedRef = useRef(elapsed);
+  const statusRefForSave = useRef(status);
+  useEffect(() => { pointsRef.current = points; }, [points]);
+  useEffect(() => { distanceRef.current = distance; }, [distance]);
+  useEffect(() => { elapsedRef.current = elapsed; }, [elapsed]);
+  useEffect(() => { statusRefForSave.current = status; }, [status]);
+
   // --- Cleanup on unmount ---
   useEffect(() => {
     return () => {
+      // 러닝 중이면 세션 저장
+      if (pointsRef.current.length > 0 && ["running", "paused"].includes(statusRefForSave.current)) {
+        const data = {
+          points: pointsRef.current,
+          distance: distanceRef.current,
+          elapsed: elapsedRef.current,
+          status: "paused" as const,
+          startTime: startTimeRef.current,
+          savedAt: Date.now(),
+        };
+        localStorage.setItem(SESSION_KEY, JSON.stringify(data));
+      }
       stopAllWatchers();
       stopHealthCheck();
       if (timerRef.current) {
