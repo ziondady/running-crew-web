@@ -1,5 +1,6 @@
 "use client";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
 
 interface RunShareCardProps {
   distance: number;
@@ -14,7 +15,6 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -189,25 +189,30 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
     }
   }, [points, distance, elapsed, pace, startTime, bgImage]);
 
-  // Draw whenever bgImage changes or on mount
-  useState(() => {
-    setTimeout(drawCard, 100);
-  });
+  // Draw on mount and whenever bgImage changes
+  useEffect(() => {
+    const timer = setTimeout(drawCard, 100);
+    return () => clearTimeout(timer);
+  }, [drawCard]);
 
-  const handleBgSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setBgImage(ev.target?.result as string);
-      setTimeout(drawCard, 200);
-    };
-    reader.readAsDataURL(file);
+  const handleBgSelect = async () => {
+    try {
+      const photo = await Camera.getPhoto({
+        resultType: CameraResultType.DataUrl,
+        source: CameraSource.Photos,
+        quality: 90,
+      });
+      if (photo.dataUrl) {
+        setBgImage(photo.dataUrl);
+      }
+    } catch {
+      // User cancelled
+    }
   };
 
   const handleSave = async () => {
     drawCard();
-    await new Promise(r => setTimeout(r, 300));
+    await new Promise(r => setTimeout(r, 100));
     const canvas = canvasRef.current;
     if (!canvas) return;
     setSaving(true);
@@ -234,20 +239,10 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
     }
   };
 
-  // Redraw when bgImage changes
-  const prevBg = useRef(bgImage);
-  if (prevBg.current !== bgImage) {
-    prevBg.current = bgImage;
-    setTimeout(drawCard, 200);
-  }
-
-  // Initial draw
-  setTimeout(drawCard, 100);
-
   return (
     <div className="fixed inset-0 z-[5000] bg-black flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ paddingTop: "calc(env(safe-area-inset-top) + 12px)" }}>
         <button onClick={onClose} className="text-white text-sm">✕ 닫기</button>
         <span className="text-white text-sm font-bold">러닝 공유</span>
         <button
@@ -264,12 +259,12 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
         <canvas
           ref={canvasRef}
           className="max-w-full max-h-full rounded-xl"
-          style={{ maxHeight: "70vh" }}
+          style={{ maxHeight: "65vh" }}
         />
       </div>
 
       {/* Controls */}
-      <div className="flex gap-2 px-4 py-4 flex-shrink-0">
+      <div className="flex gap-2 px-4 py-4 flex-shrink-0" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}>
         <button
           onClick={() => { setBgImage(null); }}
           className={`flex-1 py-3 rounded-xl text-sm font-bold ${!bgImage ? "bg-white text-black" : "bg-gray-800 text-gray-300"}`}
@@ -277,18 +272,11 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
           기본 배경
         </button>
         <button
-          onClick={() => fileInputRef.current?.click()}
+          onClick={handleBgSelect}
           className={`flex-1 py-3 rounded-xl text-sm font-bold ${bgImage ? "bg-white text-black" : "bg-gray-800 text-gray-300"}`}
         >
           📷 사진 선택
         </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleBgSelect}
-          className="hidden"
-        />
       </div>
     </div>
   );
