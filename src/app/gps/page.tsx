@@ -17,6 +17,13 @@ interface BgGeoPlugin {
 }
 const BackgroundGeolocation = registerPlugin<BgGeoPlugin>("BackgroundGeolocation");
 
+// iOS Wake Lock 네이티브 플러그인
+interface WakeLockNativePlugin {
+  acquire(): Promise<any>;
+  release(): Promise<any>;
+}
+const WakeLockNative = registerPlugin<WakeLockNativePlugin>("WakeLock");
+
 // Dynamic import for Leaflet (SSR 불가)
 const MapView = dynamic(() => import("@/components/GPSMap"), { ssr: false });
 
@@ -125,8 +132,9 @@ export default function GPSPage() {
     localStorage.removeItem(SESSION_KEY);
   }, []);
 
-  // --- Wake Lock ---
+  // --- Wake Lock (브라우저 API + iOS 네이티브) ---
   const requestWakeLock = useCallback(async () => {
+    // 브라우저 Wake Lock API (Android)
     if (typeof navigator !== "undefined" && "wakeLock" in navigator) {
       try {
         wakeLockRef.current = await (navigator as any).wakeLock.request("screen");
@@ -134,17 +142,18 @@ export default function GPSPage() {
         // Wake lock not critical — ignore errors
       }
     }
+    // iOS 네이티브 Wake Lock
+    try { await WakeLockNative.acquire(); } catch {}
   }, []);
 
   const releaseWakeLock = useCallback(async () => {
     if (wakeLockRef.current) {
       try {
         await wakeLockRef.current.release();
-      } catch {
-        // Ignore
-      }
+      } catch {}
       wakeLockRef.current = null;
     }
+    try { await WakeLockNative.release(); } catch {}
   }, []);
 
   // --- Toast ---
