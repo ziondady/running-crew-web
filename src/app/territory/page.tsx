@@ -84,17 +84,11 @@ export default function TerritoryPage() {
   const mySegments = myTerritories.length;
   const myRankEntry = ranking.find((r) => r.crew_id === me?.crew);
 
-  // 내구도 분포
-  const durDist = [5, 4, 3, 2, 1].map((lv) => ({
-    lv,
-    count: myTerritories.filter((t) => t.durability === lv).length,
-  }));
-  const durColors: Record<number, string> = { 5: "#1B5E20", 4: "#2E7D32", 3: "#43A047", 2: "#66BB6A", 1: "#A5D6A7" };
   const now = Date.now();
 
   const actionLabels: Record<string, { label: string; color: string; border: string }> = {
     claim: { label: "🎉 신규 셀 점령!", color: "text-green-600", border: "border-green-500" },
-    reinforce: { label: "🏰 셀 내구도 강화", color: "text-blue-600", border: "border-blue-500" },
+    reinforce: { label: "🏰 셀 강화", color: "text-blue-600", border: "border-blue-500" },
     takeover: { label: "⚔️ 셀 탈환당함!", color: "text-red-500", border: "border-red-500" },
   };
 
@@ -150,9 +144,6 @@ export default function TerritoryPage() {
                   </div>
                 ));
               })()}
-              <div className="flex items-center gap-1 text-[10px] text-gray-500">
-                진한 색 = 높은 내구도
-              </div>
             </div>
 
             {/* Stats */}
@@ -193,25 +184,6 @@ export default function TerritoryPage() {
                   <div className="text-[9px] opacity-80">Lv.5 셀</div>
                 </div>
               </div>
-            </div>
-
-            {/* 내구도 분포 — 쉬운 설명 추가 */}
-            <div className="bg-white rounded-xl p-4 shadow-sm mb-3">
-              <h3 className="text-sm font-bold text-green-700 mb-1">🏰 셀 내구도 분포</h3>
-              <p className="text-[10px] text-gray-400 mb-3">내구도가 높을수록 다른 크루가 빼앗기 어렵습니다</p>
-              {mySegments === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-2">크루원이 GPS로 달리면 점령이 시작됩니다</p>
-              ) : (
-                durDist.map((item) => (
-                  <div key={item.lv} className="flex items-center gap-2 py-1">
-                    <span className="text-xs font-bold w-8">Lv.{item.lv}</span>
-                    <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${mySegments > 0 ? (item.count / mySegments) * 100 : 0}%`, backgroundColor: durColors[item.lv] }} />
-                    </div>
-                    <span className="text-xs font-semibold w-10 text-right">{item.count}개</span>
-                  </div>
-                ))
-              )}
             </div>
 
             {/* 점령 활동 이력 */}

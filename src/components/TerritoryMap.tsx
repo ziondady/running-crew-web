@@ -143,7 +143,6 @@ export default function TerritoryMap({ territories, cells, myUserId, myCrewId }:
         <div style="font-size:12px;min-width:100px;">
           <strong>${cell.username}</strong><br/>
           ${cell.crew_name ? `<span style="color:${color};font-weight:bold;">${cell.crew_name}</span><br/>` : ''}
-          내구도: Lv.${cell.durability}
           ${isMyCrew ? '<br/><span style="color:#FF5722;font-size:10px;">내 크루</span>' : ''}
         </div>
       `);
@@ -199,7 +198,6 @@ export default function TerritoryMap({ territories, cells, myUserId, myCrewId }:
         <div style="font-size:12px;min-width:120px;">
           <strong>${t.username}</strong><br/>
           ${t.crew_name ? `<span style="color:${color};font-weight:bold;">${t.crew_name}</span><br/>` : ''}
-          내구도: Lv.${t.durability}
           ${isMyCrew ? '<br/><span style="color:#FF5722;font-size:10px;">내 크루</span>' : ''}
         </div>
       `);
