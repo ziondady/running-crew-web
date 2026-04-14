@@ -184,8 +184,18 @@ export default function GPSPage() {
           const spd = speed ?? null;
           if (spd !== null && spd < 0.5 && d < 0.01) return prev;
 
-          // 3. 최소 이동 거리: < 5m → skip (GPS 지터 누적 방지)
-          if (d < 0.005) return prev;
+          // 3. 최소 이동 거리: < 8m → skip (GPS 드리프트 누적 방지)
+          if (d < 0.008) return prev;
+
+          // 4. 연속 소이동 필터: 직전 3개 포인트 평균 이동이 5m 미만이면 skip
+          if (prev.length >= 3) {
+            let recentTotal = 0;
+            for (let i = prev.length - 2; i >= Math.max(0, prev.length - 3); i--) {
+              recentTotal += haversine(prev[i].lat, prev[i].lng, prev[i + 1].lat, prev[i + 1].lng);
+            }
+            const recentAvg = recentTotal / Math.min(2, prev.length - 1);
+            if (recentAvg < 0.005 && d < 0.01) return prev;
+          }
 
           setDistance((prevDist) => Math.round((prevDist + d) * 100) / 100);
         }
