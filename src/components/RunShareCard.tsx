@@ -10,10 +10,26 @@ interface RunShareCardProps {
   onClose: () => void;
 }
 
+type Template = "classic" | "stack" | "bottombar" | "minimal";
+type Step = "template" | "background";
+
+const TEMPLATE_NAMES: Record<Template, string> = {
+  classic: "클래식",
+  stack: "스택",
+  bottombar: "바텀바",
+  minimal: "미니멀",
+};
+
+const TEMPLATES: Template[] = ["classic", "stack", "bottombar", "minimal"];
+
 export default function RunShareCard({ distance, elapsed, pace, points, startTime, onClose }: RunShareCardProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [step, setStep] = useState<Step>("template");
+  const [template, setTemplate] = useState<Template>("classic");
+
+  const previewRefs = useRef<(HTMLCanvasElement | null)[]>([null, null, null, null]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -23,7 +39,7 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
 
   const formatDate = (ts: number) => {
     const d = new Date(ts);
-    return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,"0")}.${String(d.getDate()).padStart(2,"0")} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   };
 
   const fmtKm = (km: number) => {
@@ -31,32 +47,28 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
     return km.toFixed(2);
   };
 
-  const drawCard = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || points.length < 2) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+  const drawCardOnCanvas = useCallback(
+    (canvas: HTMLCanvasElement, tmpl: Template, bgImg?: HTMLImageElement) => {
+      if (points.length < 2) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-    const W = 1080;
-    const H = 1920;
-    canvas.width = W;
-    canvas.height = H;
+      const W = 1080;
+      const H = 1920;
+      canvas.width = W;
+      canvas.height = H;
 
-    const draw = (bgImg?: HTMLImageElement) => {
       // Background
       if (bgImg) {
-        // Cover fit
         const scale = Math.max(W / bgImg.width, H / bgImg.height);
         const sw = W / scale;
         const sh = H / scale;
         const sx = (bgImg.width - sw) / 2;
         const sy = (bgImg.height - sh) / 2;
         ctx.drawImage(bgImg, sx, sy, sw, sh, 0, 0, W, H);
-        // Dark overlay
         ctx.fillStyle = "rgba(0,0,0,0.4)";
         ctx.fillRect(0, 0, W, H);
       } else {
-        // Default gradient background
         const grad = ctx.createLinearGradient(0, 0, 0, H);
         grad.addColorStop(0, "#0D1B2A");
         grad.addColorStop(1, "#1A1A2E");
@@ -64,135 +76,297 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
         ctx.fillRect(0, 0, W, H);
       }
 
-      // Draw route
-      const lats = points.map(p => p.lat);
-      const lngs = points.map(p => p.lng);
+      const lats = points.map((p) => p.lat);
+      const lngs = points.map((p) => p.lng);
       const minLat = Math.min(...lats);
       const maxLat = Math.max(...lats);
       const minLng = Math.min(...lngs);
       const maxLng = Math.max(...lngs);
-
-      const padding = 120;
-      const routeArea = { x: padding, y: 300, w: W - padding * 2, h: H - 900 };
-
       const latRange = maxLat - minLat || 0.001;
       const lngRange = maxLng - minLng || 0.001;
-      const scale = Math.min(routeArea.w / lngRange, routeArea.h / latRange) * 0.85;
-
-      const centerX = routeArea.x + routeArea.w / 2;
-      const centerY = routeArea.y + routeArea.h / 2;
       const centerLat = (minLat + maxLat) / 2;
       const centerLng = (minLng + maxLng) / 2;
 
-      // Route glow
-      ctx.beginPath();
-      for (let i = 0; i < points.length; i++) {
-        const x = centerX + (points[i].lng - centerLng) * scale;
-        const y = centerY - (points[i].lat - centerLat) * scale;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
+      const FONT = "-apple-system, BlinkMacSystemFont, sans-serif";
+
+      const drawRoute = (area: { x: number; y: number; w: number; h: number }) => {
+        const routeScale = Math.min(area.w / lngRange, area.h / latRange) * 0.85;
+        const cx = area.x + area.w / 2;
+        const cy = area.y + area.h / 2;
+
+        // Glow
+        ctx.beginPath();
+        for (let i = 0; i < points.length; i++) {
+          const x = cx + (points[i].lng - centerLng) * routeScale;
+          const y = cy - (points[i].lat - centerLat) * routeScale;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = "rgba(255,255,255,0.15)";
+        ctx.lineWidth = 12;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.stroke();
+
+        // Main line
+        ctx.beginPath();
+        for (let i = 0; i < points.length; i++) {
+          const x = cx + (points[i].lng - centerLng) * routeScale;
+          const y = cy - (points[i].lat - centerLat) * routeScale;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = "#FFFFFF";
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.stroke();
+
+        // Start dot
+        const sx2 = cx + (points[0].lng - centerLng) * routeScale;
+        const sy2 = cy - (points[0].lat - centerLat) * routeScale;
+        ctx.beginPath();
+        ctx.arc(sx2, sy2, 10, 0, Math.PI * 2);
+        ctx.fillStyle = "#4CAF50";
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // End dot
+        const ex = cx + (points[points.length - 1].lng - centerLng) * routeScale;
+        const ey = cy - (points[points.length - 1].lat - centerLat) * routeScale;
+        ctx.beginPath();
+        ctx.arc(ex, ey, 10, 0, Math.PI * 2);
+        ctx.fillStyle = "#FF5722";
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      };
+
+      if (tmpl === "classic") {
+        // App name + date top center
+        ctx.fillStyle = "rgba(255,255,255,0.6)";
+        ctx.font = `bold 32px ${FONT}`;
+        ctx.textAlign = "center";
+        ctx.fillText("⚔️ 배틀크루", W / 2, 100);
+
+        ctx.fillStyle = "rgba(255,255,255,0.4)";
+        ctx.font = `24px ${FONT}`;
+        ctx.fillText(formatDate(startTime), W / 2, 150);
+
+        // Route: middle area
+        const padding = 120;
+        drawRoute({ x: padding, y: 300, w: W - padding * 2, h: H - 900 });
+
+        // Distance big center below route
+        const statsY = H - 400;
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = `bold 120px ${FONT}`;
+        ctx.textAlign = "center";
+        ctx.fillText(fmtKm(distance), W / 2, statsY);
+
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.font = `36px ${FONT}`;
+        ctx.fillText("km", W / 2, statsY + 50);
+
+        const col1X = W / 3;
+        const col2X = (W / 3) * 2;
+        const row2Y = statsY + 140;
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = `bold 48px ${FONT}`;
+        ctx.fillText(pace, col1X, row2Y);
+        ctx.fillText(formatTime(elapsed), col2X, row2Y);
+
+        ctx.fillStyle = "rgba(255,255,255,0.4)";
+        ctx.font = `24px ${FONT}`;
+        ctx.fillText("페이스", col1X, row2Y + 40);
+        ctx.fillText("시간", col2X, row2Y + 40);
+
+        // Watermark
+        ctx.fillStyle = "rgba(255,255,255,0.2)";
+        ctx.font = `20px ${FONT}`;
+        ctx.fillText("run4u.fit", W / 2, H - 60);
+      } else if (tmpl === "stack") {
+        // Route takes right 60% of canvas
+        const routeX = W * 0.4;
+        drawRoute({ x: routeX, y: 100, w: W * 0.55, h: H - 200 });
+
+        // Left side stats stacked
+        const leftX = 80;
+        let curY = 200;
+
+        // Date top-left
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.font = `24px ${FONT}`;
+        ctx.textAlign = "left";
+        ctx.fillText(formatDate(startTime), leftX, curY);
+        curY += 120;
+
+        // Distance big
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = `bold 110px ${FONT}`;
+        ctx.textAlign = "left";
+        ctx.fillText(fmtKm(distance), leftX, curY);
+        curY += 50;
+
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.font = `30px ${FONT}`;
+        ctx.fillText("km", leftX, curY);
+        curY += 100;
+
+        // Pace
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.font = `22px ${FONT}`;
+        ctx.fillText("페이스", leftX, curY);
+        curY += 40;
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = `bold 48px ${FONT}`;
+        ctx.fillText(pace, leftX, curY);
+        curY += 80;
+
+        // Time
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.font = `22px ${FONT}`;
+        ctx.fillText("시간", leftX, curY);
+        curY += 40;
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = `bold 48px ${FONT}`;
+        ctx.fillText(formatTime(elapsed), leftX, curY);
+
+        // App name watermark bottom center
+        ctx.fillStyle = "rgba(255,255,255,0.2)";
+        ctx.font = `20px ${FONT}`;
+        ctx.textAlign = "center";
+        ctx.fillText("⚔️ 배틀크루 · run4u.fit", W / 2, H - 60);
+      } else if (tmpl === "bottombar") {
+        // Date + app name small at top-left
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.font = `24px ${FONT}`;
+        ctx.textAlign = "left";
+        ctx.fillText(formatDate(startTime), 60, 90);
+
+        ctx.fillStyle = "rgba(255,255,255,0.35)";
+        ctx.font = `20px ${FONT}`;
+        ctx.fillText("⚔️ 배틀크루", 60, 130);
+
+        // Route fills most of canvas
+        const barH = 220;
+        drawRoute({ x: 60, y: 160, w: W - 120, h: H - 160 - barH - 40 });
+
+        // Horizontal bar at the bottom
+        const barY = H - barH;
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(0, barY, W, barH);
+
+        const thirdW = W / 3;
+
+        // Distance
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = `bold 72px ${FONT}`;
+        ctx.textAlign = "center";
+        ctx.fillText(fmtKm(distance), thirdW * 0.5, barY + 100);
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.font = `26px ${FONT}`;
+        ctx.fillText("거리 (km)", thirdW * 0.5, barY + 145);
+
+        // Divider
+        ctx.fillStyle = "rgba(255,255,255,0.2)";
+        ctx.fillRect(thirdW - 1, barY + 30, 2, barH - 60);
+
+        // Pace
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = `bold 72px ${FONT}`;
+        ctx.textAlign = "center";
+        ctx.fillText(pace, thirdW * 1.5, barY + 100);
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.font = `26px ${FONT}`;
+        ctx.fillText("페이스", thirdW * 1.5, barY + 145);
+
+        // Divider
+        ctx.fillStyle = "rgba(255,255,255,0.2)";
+        ctx.fillRect(thirdW * 2 - 1, barY + 30, 2, barH - 60);
+
+        // Time
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = `bold 72px ${FONT}`;
+        ctx.textAlign = "center";
+        ctx.fillText(formatTime(elapsed), thirdW * 2.5, barY + 100);
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.font = `26px ${FONT}`;
+        ctx.fillText("시간", thirdW * 2.5, barY + 145);
+      } else if (tmpl === "minimal") {
+        // Date top-left small
+        ctx.fillStyle = "rgba(255,255,255,0.4)";
+        ctx.font = `22px ${FONT}`;
+        ctx.textAlign = "left";
+        ctx.fillText(formatDate(startTime), 60, 80);
+
+        // Route fills entire canvas area
+        drawRoute({ x: 0, y: 0, w: W, h: H });
+
+        // Pace and time very small above distance
+        const smallY = H - 290;
+        ctx.fillStyle = "rgba(255,255,255,0.6)";
+        ctx.font = `28px ${FONT}`;
+        ctx.textAlign = "right";
+        ctx.fillText(`${pace}  /km    ${formatTime(elapsed)}`, W - 60, smallY);
+
+        // Distance very large bottom-right
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = `bold 160px ${FONT}`;
+        ctx.textAlign = "right";
+        ctx.fillText(fmtKm(distance), W - 50, H - 120);
+
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.font = `36px ${FONT}`;
+        ctx.fillText("km", W - 55, H - 75);
+
+        // Watermark bottom-left
+        ctx.fillStyle = "rgba(255,255,255,0.15)";
+        ctx.font = `20px ${FONT}`;
+        ctx.textAlign = "left";
+        ctx.fillText("run4u.fit", 60, H - 60);
       }
-      ctx.strokeStyle = "rgba(255,255,255,0.15)";
-      ctx.lineWidth = 12;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.stroke();
+    },
+    [points, distance, elapsed, pace, startTime, fmtKm, formatDate, formatTime]
+  );
 
-      // Route main line
-      ctx.beginPath();
-      for (let i = 0; i < points.length; i++) {
-        const x = centerX + (points[i].lng - centerLng) * scale;
-        const y = centerY - (points[i].lat - centerLat) * scale;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.strokeStyle = "#FFFFFF";
-      ctx.lineWidth = 4;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.stroke();
-
-      // Start point
-      const sx2 = centerX + (points[0].lng - centerLng) * scale;
-      const sy2 = centerY - (points[0].lat - centerLat) * scale;
-      ctx.beginPath();
-      ctx.arc(sx2, sy2, 10, 0, Math.PI * 2);
-      ctx.fillStyle = "#4CAF50";
-      ctx.fill();
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      // End point
-      const ex = centerX + (points[points.length-1].lng - centerLng) * scale;
-      const ey = centerY - (points[points.length-1].lat - centerLat) * scale;
-      ctx.beginPath();
-      ctx.arc(ex, ey, 10, 0, Math.PI * 2);
-      ctx.fillStyle = "#FF5722";
-      ctx.fill();
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      // Top: App name + date
-      ctx.fillStyle = "rgba(255,255,255,0.6)";
-      ctx.font = "bold 32px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("⚔️ 배틀크루", W / 2, 100);
-
-      ctx.fillStyle = "rgba(255,255,255,0.4)";
-      ctx.font = "24px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(formatDate(startTime), W / 2, 150);
-
-      // Bottom: Stats
-      const statsY = H - 400;
-
-      // Distance (big)
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "bold 120px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(fmtKm(distance), W / 2, statsY);
-
-      ctx.fillStyle = "rgba(255,255,255,0.5)";
-      ctx.font = "36px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText("km", W / 2, statsY + 50);
-
-      // Pace and Time
-      const col1X = W / 3;
-      const col2X = (W / 3) * 2;
-      const row2Y = statsY + 140;
-
-      ctx.fillStyle = "#FFFFFF";
-      ctx.font = "bold 48px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText(pace, col1X, row2Y);
-      ctx.fillText(formatTime(elapsed), col2X, row2Y);
-
-      ctx.fillStyle = "rgba(255,255,255,0.4)";
-      ctx.font = "24px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText("페이스", col1X, row2Y + 40);
-      ctx.fillText("시간", col2X, row2Y + 40);
-
-      // Bottom watermark
-      ctx.fillStyle = "rgba(255,255,255,0.2)";
-      ctx.font = "20px -apple-system, BlinkMacSystemFont, sans-serif";
-      ctx.fillText("run4u.fit", W / 2, H - 60);
-    };
+  const drawCard = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
     if (bgImage) {
       const img = new Image();
       img.crossOrigin = "anonymous";
-      img.onload = () => draw(img);
+      img.onload = () => drawCardOnCanvas(canvas, template, img);
       img.src = bgImage;
     } else {
-      draw();
+      drawCardOnCanvas(canvas, template);
     }
-  }, [points, distance, elapsed, pace, startTime, bgImage]);
+  }, [drawCardOnCanvas, template, bgImage]);
 
-  // Draw on mount and whenever bgImage changes
+  // Draw main canvas when on background step or when template/bg changes
   useEffect(() => {
+    if (step !== "background") return;
     const timer = setTimeout(drawCard, 100);
     return () => clearTimeout(timer);
-  }, [drawCard]);
+  }, [drawCard, step]);
+
+  // Draw preview canvases when on template step
+  useEffect(() => {
+    if (step !== "template") return;
+    const timer = setTimeout(() => {
+      TEMPLATES.forEach((tmpl, idx) => {
+        const canvas = previewRefs.current[idx];
+        if (canvas) {
+          drawCardOnCanvas(canvas, tmpl);
+        }
+      });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [step, drawCardOnCanvas]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -212,15 +386,14 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
 
   const handleSave = async () => {
     drawCard();
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
     const canvas = canvasRef.current;
     if (!canvas) return;
     setSaving(true);
     try {
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png"));
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
       if (!blob) return;
 
-      // Try native share first, then download
       if (navigator.share) {
         const file = new File([blob], "battlecrew-run.png", { type: "image/png" });
         await navigator.share({ files: [file] });
@@ -232,18 +405,71 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
         a.click();
         URL.revokeObjectURL(url);
       }
-    } catch (err) {
+    } catch {
       // User cancelled share
     } finally {
       setSaving(false);
     }
   };
 
+  const handleSelectTemplate = (tmpl: Template) => {
+    setTemplate(tmpl);
+    setStep("background");
+  };
+
+  if (step === "template") {
+    return (
+      <div className="fixed inset-0 z-[5000] bg-black flex flex-col">
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-4 py-3 flex-shrink-0"
+          style={{ paddingTop: "max(env(safe-area-inset-top, 0px) + 12px, 48px)" }}
+        >
+          <button onClick={onClose} className="text-white text-sm">
+            ✕ 닫기
+          </button>
+          <span className="text-white text-sm font-bold">템플릿 선택</span>
+          <span className="w-12" />
+        </div>
+
+        {/* 2x2 grid of template previews */}
+        <div className="flex-1 overflow-y-auto px-4 py-4">
+          <div className="grid grid-cols-2 gap-4">
+            {TEMPLATES.map((tmpl, idx) => (
+              <button
+                key={tmpl}
+                onClick={() => handleSelectTemplate(tmpl)}
+                className="flex flex-col items-center gap-2"
+              >
+                <div className="w-full rounded-xl overflow-hidden border-2 border-transparent hover:border-orange-500 active:border-orange-500">
+                  <canvas
+                    ref={(el) => {
+                      previewRefs.current[idx] = el;
+                    }}
+                    className="w-full"
+                    style={{ display: "block", aspectRatio: "1080/1920" }}
+                  />
+                </div>
+                <span className="text-white text-sm font-bold">{TEMPLATE_NAMES[tmpl]}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // step === "background"
   return (
     <div className="fixed inset-0 z-[5000] bg-black flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 flex-shrink-0" style={{ paddingTop: "max(env(safe-area-inset-top, 0px) + 12px, 48px)" }}>
-        <button onClick={onClose} className="text-white text-sm">✕ 닫기</button>
+      <div
+        className="flex items-center justify-between px-4 py-3 flex-shrink-0"
+        style={{ paddingTop: "max(env(safe-area-inset-top, 0px) + 12px, 48px)" }}
+      >
+        <button onClick={() => setStep("template")} className="text-white text-sm">
+          ← 뒤로
+        </button>
         <span className="text-white text-sm font-bold">러닝 공유</span>
         <button
           onClick={handleSave}
@@ -264,9 +490,14 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
       </div>
 
       {/* Controls */}
-      <div className="flex gap-2 px-4 py-4 flex-shrink-0" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}>
+      <div
+        className="flex gap-2 px-4 py-4 flex-shrink-0"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 12px)" }}
+      >
         <button
-          onClick={() => { setBgImage(null); }}
+          onClick={() => {
+            setBgImage(null);
+          }}
           className={`flex-1 py-3 rounded-xl text-sm font-bold ${!bgImage ? "bg-white text-black" : "bg-gray-800 text-gray-300"}`}
         >
           기본 배경
@@ -277,13 +508,7 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
         >
           📷 사진 선택
         </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileChange}
-          className="hidden"
-        />
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
       </div>
     </div>
   );
