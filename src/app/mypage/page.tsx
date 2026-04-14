@@ -24,6 +24,10 @@ export default function MyPage() {
   const [pwMessage, setPwMessage] = useState("");
   const [pwLoading, setPwLoading] = useState(false);
 
+  const [appConfig, setAppConfig] = useState<Record<string, string>>({});
+  const [configLoading, setConfigLoading] = useState(false);
+  const [configMessage, setConfigMessage] = useState("");
+
   useEffect(() => {
     const stored = getStoredUser();
     if (!stored) { router.replace("/"); return; }
@@ -32,6 +36,15 @@ export default function MyPage() {
       .then((data) => { setUser(data); saveUser(data); setLoading(false); })
       .catch(() => { setUser(stored); setLoading(false); });
   }, [router]);
+
+  useEffect(() => {
+    if (user?.is_superuser) {
+      fetch(`${API_BASE}/accounts/app-config/`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((data) => setAppConfig(data))
+        .catch(() => {});
+    }
+  }, [user]);
 
   const handleLogout = () => {
     clearUser();
@@ -319,6 +332,67 @@ export default function MyPage() {
                 <span className="text-gray-300">›</span>
               </button>
             ))}
+          </div>
+        )}
+
+        {/* 최고관리자 메뉴 */}
+        {user.is_superuser && (
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-red-500 px-1">🔑 최고관리자</p>
+            <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+              <div className="text-sm font-bold">앱 버전 관리</div>
+              <div>
+                <label className="text-[10px] text-gray-500">최소 앱 버전</label>
+                <input
+                  type="text"
+                  value={appConfig.min_app_version || ""}
+                  onChange={(e) => setAppConfig((p) => ({ ...p, min_app_version: e.target.value }))}
+                  placeholder="1.0.0"
+                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm outline-none mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-500">다운로드 URL</label>
+                <input
+                  type="text"
+                  value={appConfig.app_download_url || ""}
+                  onChange={(e) => setAppConfig((p) => ({ ...p, app_download_url: e.target.value }))}
+                  placeholder="https://..."
+                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm outline-none mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-gray-500">업데이트 안내 메시지</label>
+                <input
+                  type="text"
+                  value={appConfig.app_update_message || ""}
+                  onChange={(e) => setAppConfig((p) => ({ ...p, app_update_message: e.target.value }))}
+                  placeholder="새로운 버전이 출시되었습니다."
+                  className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm outline-none mt-1"
+                />
+              </div>
+              {configMessage && <p className="text-xs text-green-500">{configMessage}</p>}
+              <button
+                onClick={async () => {
+                  setConfigLoading(true);
+                  try {
+                    const res = await fetch(`${API_BASE}/accounts/app-config/`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ ...appConfig, user_id: user.id }),
+                    });
+                    const data = await res.json();
+                    setConfigMessage(data.message || data.error);
+                    setTimeout(() => setConfigMessage(""), 3000);
+                  } catch { setConfigMessage("저장 실패"); }
+                  finally { setConfigLoading(false); }
+                }}
+                disabled={configLoading}
+                className="w-full bg-red-500 text-white rounded-lg py-2.5 text-sm font-bold disabled:opacity-50"
+              >
+                {configLoading ? '저장 중...' : '설정 저장'}
+              </button>
+            </div>
           </div>
         )}
       </div>

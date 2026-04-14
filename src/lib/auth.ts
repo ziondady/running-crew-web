@@ -13,6 +13,7 @@ export interface AuthUser {
   run_days: number;
   monthly_meetup: number;
   territory_count: number;
+  is_superuser?: boolean;
 }
 
 const STORAGE_KEY = 'running_crew_user';

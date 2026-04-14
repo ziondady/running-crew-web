@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import VersionCheck from "@/components/VersionCheck";
 
 export const viewport = {
   width: 'device-width',
@@ -23,6 +24,7 @@ export default function RootLayout({
     <html lang="ko" className="h-full antialiased">
       <body className="min-h-full bg-[#F0F2F5]">
         <div className="max-w-[430px] w-full mx-auto min-h-screen bg-[var(--bg)] shadow-lg">
+          <VersionCheck />
           {children}
         </div>
       </body>
