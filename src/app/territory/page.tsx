@@ -91,25 +91,10 @@ export default function TerritoryPage() {
   }));
   const durColors: Record<number, string> = { 5: "#1B5E20", 4: "#2E7D32", 3: "#43A047", 2: "#66BB6A", 1: "#A5D6A7" };
 
-  // 자연감소 예정 (7일 기준)
-  const now = Date.now();
-  const decayWarnings = myTerritories
-    .map((t) => {
-      const lastRun = new Date(t.last_run_at).getTime();
-      const daysSince = Math.floor((now - lastRun) / 86400000);
-      const daysUntilDecay = 7 - daysSince;
-      if (daysUntilDecay <= 7 && daysUntilDecay > 0) {
-        return { id: t.id, durability: t.durability, daysLeft: daysUntilDecay };
-      }
-      return null;
-    })
-    .filter(Boolean) as { id: number; durability: number; daysLeft: number }[];
-
   const actionLabels: Record<string, { label: string; color: string; border: string }> = {
     claim: { label: "🎉 신규 셀 점령!", color: "text-green-600", border: "border-green-500" },
     reinforce: { label: "🏰 셀 내구도 강화", color: "text-blue-600", border: "border-blue-500" },
     takeover: { label: "⚔️ 셀 탈환당함!", color: "text-red-500", border: "border-red-500" },
-    decay: { label: "📉 내구도 감소", color: "text-orange-600", border: "border-orange-400" },
   };
 
   return (
@@ -227,22 +212,6 @@ export default function TerritoryPage() {
                 ))
               )}
             </div>
-
-            {/* 자연감소 경고 */}
-            {decayWarnings.length > 0 && (
-              <div className="bg-white rounded-xl p-4 shadow-sm mb-3">
-                <h3 className="text-sm font-bold text-orange-700 mb-1">⚠️ 내구도 감소 예정</h3>
-                <p className="text-[10px] text-gray-400 mb-3">방문하지 않은 점령지는 7일마다 내구도가 1씩 감소합니다</p>
-                {decayWarnings.map((w) => (
-                  <div key={w.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-b-0">
-                    <span className="text-xs">점령지 #{w.id} ({myTerritories.find(t => t.id === w.id)?.path_data?.length ?? 0}GPS 포인트)</span>
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600">
-                      {w.daysLeft}일 후 Lv.{w.durability}→{w.durability - 1 === 0 ? "소멸" : w.durability - 1}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
 
             {/* 점령 활동 이력 */}
             <div className="bg-white rounded-xl p-4 shadow-sm mb-3">
