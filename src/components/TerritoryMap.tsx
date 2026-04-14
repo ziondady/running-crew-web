@@ -216,33 +216,20 @@ export default function TerritoryMap({ territories, cells, myUserId, myCrewId }:
   }, [territories, cells, myUserId, myCrewId, filter]);
 
   return (
-    <div className="relative rounded-xl overflow-hidden">
-      <div ref={containerRef} className="w-full" style={{ height: "55vh", background: "#e8e8e8" }} />
-      <div className="absolute top-3 left-3 z-[9999] flex gap-1" style={{ pointerEvents: "auto" }}>
-        <button
-          onClick={() => setFilter("all")}
-          className={`px-3 py-1.5 rounded-full text-[11px] font-bold shadow-md transition-all ${
-            filter === "all" ? "bg-white text-gray-800" : "bg-black/40 text-white"
-          }`}
-        >
-          전체
-        </button>
-        <button
-          onClick={() => setFilter("crew")}
-          className={`px-3 py-1.5 rounded-full text-[11px] font-bold shadow-md transition-all ${
-            filter === "crew" ? "bg-white text-gray-800" : "bg-black/40 text-white"
-          }`}
-        >
-          내 크루
-        </button>
-        <button
-          onClick={() => setFilter("my")}
-          className={`px-3 py-1.5 rounded-full text-[11px] font-bold shadow-md transition-all ${
-            filter === "my" ? "bg-white text-gray-800" : "bg-black/40 text-white"
-          }`}
-        >
-          내 영역
-        </button>
+    <div>
+      <div ref={containerRef} className="w-full rounded-xl overflow-hidden" style={{ height: "55vh", background: "#e8e8e8" }} />
+      <div className="flex gap-1.5 mt-2">
+        {([["all", "전체"], ["crew", "내 크루"], ["my", "내 영역"]] as const).map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setFilter(key)}
+            className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${
+              filter === key ? "bg-[var(--dark)] text-white" : "bg-gray-200 text-gray-400"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   );
