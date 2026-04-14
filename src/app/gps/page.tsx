@@ -26,6 +26,7 @@ const WakeLockNative = registerPlugin<WakeLockNativePlugin>("WakeLock");
 
 // Dynamic import for Leaflet (SSR 불가)
 const MapView = dynamic(() => import("@/components/GPSMap"), { ssr: false });
+const RunShareCard = dynamic(() => import("@/components/RunShareCard"), { ssr: false });
 
 interface GpsPoint {
   lat: number;
@@ -106,6 +107,7 @@ export default function GPSPage() {
   const firstPointTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restartStateRef = useRef({ count: 0, windowStart: 0 });
   const lastWarnRef = useRef(0);
+  const [showShare, setShowShare] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<PermissionStatus | null>(null);
   const [recoveryPrompt, setRecoveryPrompt] = useState<{ points: GpsPoint[]; distance: number; elapsed: number; startTime: number } | null>(null);
 
@@ -987,7 +989,13 @@ export default function GPSPage() {
             <div className="text-3xl mb-2" style={{ animation: "confettiFall 2s ease-in-out infinite" }}>🎉</div>
             <div className="text-lg font-bold text-green-400">저장 완료!</div>
             <div className="text-xs text-gray-500 mt-1">점령전에 반영됩니다</div>
-            <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => setShowShare(true)}
+              className="w-full bg-white/10 border border-white/20 text-white rounded-xl py-3 text-sm font-bold active:scale-95 transition-transform mb-2 mt-3"
+            >
+              📸 러닝 공유 이미지 만들기
+            </button>
+            <div className="flex gap-2">
               <button onClick={handleReset} className="flex-1 bg-gray-700 text-gray-300 rounded-xl py-3 text-xs font-bold">
                 다시 달리기
               </button>
@@ -998,6 +1006,17 @@ export default function GPSPage() {
           </div>
         )}
       </div>
+
+      {showShare && (
+        <RunShareCard
+          distance={distance}
+          elapsed={elapsed}
+          pace={formatPace(pace)}
+          points={points.map(p => ({ lat: p.lat, lng: p.lng }))}
+          startTime={startTimeRef.current}
+          onClose={() => setShowShare(false)}
+        />
+      )}
     </div>
   );
 }
