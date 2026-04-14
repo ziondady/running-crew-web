@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import VersionCheck from "@/components/VersionCheck";
+import BackButtonHandler from "@/components/BackButtonHandler";
 
 export const viewport = {
   width: 'device-width',
@@ -25,6 +26,7 @@ export default function RootLayout({
       <body className="min-h-full bg-[#F0F2F5]">
         <div className="max-w-[430px] w-full mx-auto min-h-screen bg-[var(--bg)] shadow-lg">
           <VersionCheck />
+          <BackButtonHandler />
           {children}
         </div>
       </body>
