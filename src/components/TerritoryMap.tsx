@@ -4,23 +4,15 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getCachedLocation } from "@/lib/location";
 
-interface CellBounds {
-  south: number;
-  west: number;
-  north: number;
-  east: number;
-}
-
 interface TerritoryItem {
   id: number;
-  cell_key: string;
   user: number;
   username: string;
   user_color: string;
   crew_id: number | null;
   crew_name: string | null;
   durability: number;
-  bounds: CellBounds;
+  path_data: { lat: number; lng: number }[];
 }
 
 interface TerritoryMapProps {
@@ -83,7 +75,7 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
     };
   }, []);
 
-  // Draw territory cells when data changes
+  // Draw territory routes when data changes
   useEffect(() => {
     if (!mapRef.current || !layersRef.current) return;
     const layers = layersRef.current;
@@ -108,28 +100,31 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
     const allBounds: [number, number][] = [];
 
     territories.forEach((t) => {
-      if (!t.bounds) return;
-      const { south, west, north, east } = t.bounds;
-      allBounds.push([south, west], [north, east]);
+      if (!t.path_data || t.path_data.length < 2) return;
 
+      const latLngs = t.path_data.map(p => [p.lat, p.lng] as [number, number]);
       const isMyCrew = t.crew_id === myCrewId;
-      const color = t.crew_id ? (crewColorMap[t.crew_id] || "#999") : "#999";
+      const color = t.crew_id ? (crewColorMap[t.crew_id] || "#999") : (t.user_color || "#999");
+      const fillOpacity = 0.3 + t.durability * 0.1;
+      const weight = 8 + t.durability * 2;
 
-      // 내구도에 따른 투명도 (1~5 → 0.25~0.65)
-      const fillOpacity = 0.2 + t.durability * 0.09;
+      // Thick semi-transparent corridor
+      const corridor = L.polyline(latLngs, {
+        color: color,
+        weight: weight,
+        opacity: fillOpacity,
+        lineCap: 'round',
+        lineJoin: 'round',
+      });
 
-      const rect = L.rectangle(
-        [[south, west], [north, east]],
-        {
-          color: color,
-          weight: isMyCrew ? 1.5 : 1,
-          opacity: 0.9,
-          fillColor: color,
-          fillOpacity: fillOpacity,
-        }
-      );
+      // Thin solid route line on top
+      const route = L.polyline(latLngs, {
+        color: color,
+        weight: 2,
+        opacity: 0.8,
+      });
 
-      rect.bindPopup(`
+      corridor.bindPopup(`
         <div style="font-size:12px;min-width:120px;">
           <strong>${t.username}</strong><br/>
           ${t.crew_name ? `<span style="color:${color};font-weight:bold;">${t.crew_name}</span><br/>` : ''}
@@ -138,10 +133,14 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
         </div>
       `);
 
-      rect.addTo(layers);
+      corridor.addTo(layers);
+      route.addTo(layers);
+
+      // Collect bounds
+      latLngs.forEach(ll => allBounds.push(ll));
     });
 
-    // Fit bounds to show all cells
+    // Fit bounds to show all routes
     if (allBounds.length > 0) {
       const bounds = L.latLngBounds(allBounds);
       mapRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
