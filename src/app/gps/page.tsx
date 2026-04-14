@@ -507,9 +507,10 @@ export default function GPSPage() {
     })();
   }, []);
 
-  // --- visibilitychange: save state when app goes to background ---
+  // --- visibilitychange: save state + Wake Lock 재획득 + GPS 재시작 ---
   useEffect(() => {
     const handleVisibility = () => {
+      // 세션 저장
       setPoints((pts) => {
         setDistance((dist) => {
           setElapsed((el) => {
@@ -523,10 +524,20 @@ export default function GPSPage() {
         });
         return pts;
       });
+
+      // 앱 복귀 시 (visible) 러닝 중이면 Wake Lock 재획득 + GPS 재시작
+      if (document.visibilityState === "visible" && statusRef.current === "running") {
+        requestWakeLock();
+        // GPS가 끊겼을 수 있으므로 watcher 재시작
+        const gap = Date.now() - lastGpsTimeRef.current;
+        if (gap > 10000) {
+          restartWatcher();
+        }
+      }
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [saveSession]);
+  }, [saveSession, requestWakeLock, restartWatcher]);
 
   // --- Cleanup on unmount ---
   useEffect(() => {
