@@ -99,14 +99,14 @@ export default function TerritoryMap({ territories, myUserId, myCrewId }: Territ
 
     const allBounds: [number, number][] = [];
 
-    // 시작점과 끝점이 가까우면(50m 이내) 폐합 경로로 판단
+    // 시작점과 끝점이 가까우면(100m 이내) 폐합 경로로 판단
     function isClosed(pts: [number, number][]): boolean {
       if (pts.length < 10) return false;
       const first = pts[0];
       const last = pts[pts.length - 1];
       const dLat = (first[0] - last[0]) * 111320;
       const dLng = (first[1] - last[1]) * 111320 * Math.cos(first[0] * Math.PI / 180);
-      return Math.sqrt(dLat * dLat + dLng * dLng) < 50;
+      return Math.sqrt(dLat * dLat + dLng * dLng) < 100;
     }
 
     territories.forEach((t) => {
