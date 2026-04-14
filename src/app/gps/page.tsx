@@ -1,11 +1,11 @@
 "use client";
-import { API_BASE } from "@/lib/api";
+import { API_BASE, getTerritoryCells } from "@/lib/api";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getStoredUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
-import { saveLocation } from "@/lib/location";
+import { saveLocation, getCachedLocation } from "@/lib/location";
 import { registerPlugin } from "@capacitor/core";
 import { checkGpsPermission, PermissionStatus } from "@/lib/gpsPermissions";
 import { startBackup, appendPoint as appendBackupPoint, readBackup, clearBackup } from "@/lib/gpsBackup";
@@ -40,6 +40,18 @@ interface SessionData {
   elapsed: number;
   status: "idle" | "running" | "paused" | "stopped";
   startTime: number;
+}
+
+interface CellItem {
+  id: number;
+  cell_key: string;
+  user: number;
+  username: string;
+  user_color: string;
+  crew_id: number | null;
+  crew_name: string | null;
+  durability: number;
+  bounds: { south: number; north: number; west: number; east: number };
 }
 
 const SESSION_KEY = "gps_session";
@@ -88,12 +100,16 @@ export default function GPSPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [locked, setLocked] = useState(false);
-  const [countdown, setCountdown] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState<number | string | null>(null);
   const [gpsNotReady, setGpsNotReady] = useState(false);
+  const [gpsWarmupReady, setGpsWarmupReady] = useState(false);
+  const [territoryCells, setTerritoryCells] = useState<CellItem[]>([]);
+  const [showTerritoryCells, setShowTerritoryCells] = useState(true);
 
   // watchIdRef now stores a string (Capacitor) or null; fallback stores a string as well
   const bgWatcherIdRef = useRef<string | null>(null);
   const fgWatchIdRef = useRef<string | null>(null);
+  const warmupWatchIdRef = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
   const pausedTimeRef = useRef<number>(0);
@@ -181,8 +197,8 @@ export default function GPSPage() {
           const d = haversine(last.lat, last.lng, lat, lng);
           const timeDelta = (now - last.timestamp) / 1000; // seconds
 
-          // 1. GPS 튐 방지: 시간 대비 비현실적 이동 (50km/h 이상) → skip
-          if (timeDelta > 0 && d / timeDelta > 0.0139) return prev;
+          // 1. GPS 튐 방지: 시간 대비 비현실적 이동 (300km/h 이상) → skip  [TEMP: raised for car testing]
+          if (timeDelta > 0 && d / timeDelta > 0.0833) return prev;
 
           // 2. 정지 상태 필터: speed < 0.5 m/s AND 이동 < 10m → skip
           const spd = speed ?? null;
@@ -395,6 +411,15 @@ export default function GPSPage() {
 
     await requestWakeLock();
 
+    // 캐시된 위치가 있으면 즉시 첫 포인트로 추가 (S 핀이 바로 보이도록)
+    if (points.length === 0) {
+      const cached = getCachedLocation();
+      if (cached) {
+        const seedPoint: GpsPoint = { lat: cached.lat, lng: cached.lng, timestamp: Date.now() };
+        setPoints([seedPoint]);
+      }
+    }
+
     // 네이티브 백업 파일 초기화 (이어달리기면 기존 백업 유지, 신규 시작이면 초기화)
     if (points.length === 0) {
       try { await startBackup(); } catch {}
@@ -455,35 +480,30 @@ export default function GPSPage() {
     await new Promise(r => setTimeout(r, 1000));
     setCountdown(1);
     await new Promise(r => setTimeout(r, 1000));
+    setCountdown("점령시작!");
+    await new Promise(r => setTimeout(r, 700));
     setCountdown(null);
     startTracking();
   }, [startTracking]);
 
-  const handleStart = useCallback(async () => {
-    // 1. GPS 체크 먼저
-    let gpsReady = false;
-    try {
-      await new Promise<void>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          () => resolve(),
-          () => reject(),
-          { enableHighAccuracy: true, timeout: 2000, maximumAge: 0 }
-        );
-      });
-      gpsReady = true;
-    } catch {
-      gpsReady = false;
+  const stopWarmup = useCallback(() => {
+    if (warmupWatchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(warmupWatchIdRef.current);
+      warmupWatchIdRef.current = null;
     }
+  }, []);
 
-    if (!gpsReady) {
-      // GPS 안 잡힘 - 진행 여부 확인
+  const handleStart = useCallback(async () => {
+    if (!gpsWarmupReady) {
+      // 워밍업으로도 GPS 안 잡힘 - 진행 여부 확인
       setGpsNotReady(true);
       return;
     }
 
-    // GPS 잡힘 - 카운트다운 후 시작
+    // 워밍업 워처 정리 후 카운트다운 → 시작
+    stopWarmup();
     await startWithCountdown();
-  }, [startWithCountdown]);
+  }, [gpsWarmupReady, startWithCountdown, stopWarmup]);
 
   stopTracking = useCallback(async () => {
     await stopAllWatchers();
@@ -565,7 +585,29 @@ export default function GPSPage() {
           startTime: sessionStartTime || Date.now(),
         });
       }
+
+      // 영역 셀 로드
+      getTerritoryCells().then(setTerritoryCells).catch(() => {});
     })();
+  }, []);
+
+  // --- GPS 워밍업: 페이지 진입 시 바로 GPS 잡기 ---
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        setGpsAccuracy(pos.coords.accuracy);
+        setGpsWarmupReady(true);
+        saveLocation(pos.coords.latitude, pos.coords.longitude);
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+    warmupWatchIdRef.current = id;
+    return () => {
+      navigator.geolocation.clearWatch(id);
+      warmupWatchIdRef.current = null;
+    };
   }, []);
 
   // --- visibilitychange: save state + Wake Lock 재획득 + GPS 재시작 ---
@@ -767,7 +809,10 @@ export default function GPSPage() {
       {/* 카운트다운 오버레이 */}
       {countdown !== null && (
         <div className="absolute inset-0 z-[3000] bg-black flex items-center justify-center">
-          <div className="text-white text-9xl font-black" style={{ animation: "kmPop 0.3s ease-out" }}>
+          <div
+            className={`font-black ${typeof countdown === "string" ? "text-6xl text-[#FF5722]" : "text-9xl text-white"}`}
+            style={{ animation: "kmPop 0.3s ease-out" }}
+          >
             {countdown}
           </div>
         </div>
@@ -788,7 +833,7 @@ export default function GPSPage() {
                 기다릴게요
               </button>
               <button
-                onClick={() => { startWithCountdown(); }}
+                onClick={() => { stopWarmup(); startWithCountdown(); }}
                 className="flex-1 bg-green-500 text-white rounded-xl py-3 text-sm font-bold"
               >
                 일단 시작
@@ -835,7 +880,13 @@ export default function GPSPage() {
 
       {/* Map - fills remaining space */}
       <div className="flex-1 relative">
-        <MapView points={points} currentPos={currentPos} />
+        <MapView
+          points={points}
+          currentPos={currentPos}
+          cells={showTerritoryCells ? territoryCells : []}
+          showCells={showTerritoryCells}
+          myCrewId={getStoredUser()?.crew ?? null}
+        />
 
         {/* Toast popup */}
         {toast && (
@@ -886,6 +937,16 @@ export default function GPSPage() {
           </>
         )}
 
+        {/* Territory cells toggle button */}
+        <button
+          onClick={() => setShowTerritoryCells(v => !v)}
+          className={`absolute bottom-3 right-3 z-[1000] w-10 h-10 rounded-xl shadow-lg flex items-center justify-center text-lg active:scale-95 transition-transform ${
+            showTerritoryCells ? "bg-[#FF5722] text-white" : "bg-black/50 text-white"
+          }`}
+        >
+          🗺️
+        </button>
+
       </div>
 
       {/* Stats panel */}
@@ -918,6 +979,15 @@ export default function GPSPage() {
         {error && (
           <div className="bg-red-500/20 text-red-400 text-xs rounded-lg px-3 py-2 mb-3 text-center">
             {error}
+          </div>
+        )}
+
+        {/* GPS 워밍업 상태 표시 */}
+        {status === "idle" && !saved && (
+          <div className={`text-xs text-center mb-2 ${gpsWarmupReady ? "text-green-400" : "text-yellow-400 animate-pulse"}`}>
+            {gpsWarmupReady
+              ? `GPS 준비 완료${gpsAccuracy !== null ? ` (정확도 ${Math.round(gpsAccuracy)}m)` : ""}`
+              : "GPS 신호 잡는 중..."}
           </div>
         )}
 

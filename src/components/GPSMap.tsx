@@ -10,16 +10,38 @@ interface GpsPoint {
   timestamp: number;
 }
 
+interface CellItem {
+  id: number;
+  cell_key: string;
+  user: number;
+  username: string;
+  user_color: string;
+  crew_id: number | null;
+  crew_name: string | null;
+  durability: number;
+  bounds: { south: number; north: number; west: number; east: number };
+}
+
+const CREW_COLORS = [
+  "#FF5722", "#1565C0", "#2E7D32", "#9C27B0", "#F57C00",
+  "#00838F", "#C62828", "#4527A0", "#EF6C00", "#00695C",
+  "#AD1457", "#283593", "#558B2F", "#6A1B9A", "#D84315",
+];
+
 interface GPSMapProps {
   points: GpsPoint[];
   currentPos: GpsPoint | null;
+  cells?: CellItem[];
+  showCells?: boolean;
+  myCrewId?: number | null;
 }
 
-export default function GPSMap({ points, currentPos }: GPSMapProps) {
+export default function GPSMap({ points, currentPos, cells = [], showCells = false, myCrewId }: GPSMapProps) {
   const mapRef = useRef<L.Map | null>(null);
   const polylineRef = useRef<L.Polyline | null>(null);
   const markerRef = useRef<L.CircleMarker | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const cellsLayerRef = useRef<L.LayerGroup | null>(null);
 
   // Initialize map
   useEffect(() => {
@@ -56,6 +78,9 @@ export default function GPSMap({ points, currentPos }: GPSMapProps) {
     });
     new locateControl().addTo(map);
 
+    // Layer group for territory cells
+    cellsLayerRef.current = L.layerGroup().addTo(map);
+
     mapRef.current = map;
 
     // 초기 위치는 캐시 사용 (네이티브 GPS가 업데이트하면 currentPos로 지도 이동됨)
@@ -63,8 +88,49 @@ export default function GPSMap({ points, currentPos }: GPSMapProps) {
     return () => {
       map.remove();
       mapRef.current = null;
+      cellsLayerRef.current = null;
     };
   }, []);
+
+  // Update territory cells layer
+  useEffect(() => {
+    if (!mapRef.current || !cellsLayerRef.current) return;
+    const layer = cellsLayerRef.current;
+    layer.clearLayers();
+
+    if (!showCells || cells.length === 0) return;
+
+    // Build crew color map
+    const crewIds = [...new Set(cells.map(c => c.crew_id).filter(Boolean))] as number[];
+    const crewColorMap: Record<number, string> = {};
+    if (myCrewId) {
+      crewColorMap[myCrewId] = CREW_COLORS[0];
+    }
+    let colorIdx = 1;
+    crewIds.forEach(cid => {
+      if (!crewColorMap[cid]) {
+        crewColorMap[cid] = CREW_COLORS[colorIdx % CREW_COLORS.length];
+        colorIdx++;
+      }
+    });
+
+    cells.forEach((cell) => {
+      const { south, west, north, east } = cell.bounds;
+      const color = cell.crew_id ? (crewColorMap[cell.crew_id] || "#999") : (cell.user_color || "#999");
+      const fillOpacity = 0.25 + cell.durability * 0.08;
+
+      L.rectangle(
+        [[south, west], [north, east]],
+        {
+          color: color,
+          weight: 0.5,
+          opacity: 0.3,
+          fillColor: color,
+          fillOpacity: fillOpacity,
+        }
+      ).addTo(layer);
+    });
+  }, [cells, showCells, myCrewId]);
 
   // Update polyline and marker
   useEffect(() => {
