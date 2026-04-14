@@ -87,6 +87,8 @@ export default function GPSPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [locked, setLocked] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [gpsNotReady, setGpsNotReady] = useState(false);
 
   // watchIdRef now stores a string (Capacitor) or null; fallback stores a string as well
   const bgWatcherIdRef = useRef<string | null>(null);
@@ -443,6 +445,29 @@ export default function GPSPage() {
     startTracking();
   }, [startTracking]);
 
+  const handleStart = useCallback(async () => {
+    setCountdown(3);
+    await new Promise(r => setTimeout(r, 1000));
+    setCountdown(2);
+    await new Promise(r => setTimeout(r, 1000));
+    setCountdown(1);
+    await new Promise(r => setTimeout(r, 1000));
+    setCountdown(null);
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          () => resolve(),
+          () => reject(),
+          { enableHighAccuracy: true, timeout: 2000, maximumAge: 0 }
+        );
+      });
+      startTracking();
+    } catch {
+      setGpsNotReady(true);
+    }
+  }, [startTracking]);
+
   stopTracking = useCallback(async () => {
     await stopAllWatchers();
     stopHealthCheck();
@@ -629,10 +654,13 @@ export default function GPSPage() {
     setElapsed(recoveryPrompt.elapsed);
     pausedTimeRef.current = recoveryPrompt.elapsed;
     startTimeRef.current = recoveryPrompt.startTime;
+    // Set to paused first so startTracking computes correct elapsed offset
     setStatus("paused");
     statusRef.current = "paused";
     setRecoveryPrompt(null);
-  }, [recoveryPrompt]);
+    // Auto-resume so the user doesn't need a second tap
+    startTracking();
+  }, [recoveryPrompt, startTracking]);
 
   const dismissRecovery = useCallback(async () => {
     setRecoveryPrompt(null);
@@ -691,6 +719,40 @@ export default function GPSPage() {
             <div className="text-gray-400 text-xs mt-1">두 번 터치하면 잠금 해제</div>
             <div className="text-white text-2xl font-black mt-4">{fmtKm(distance)} km</div>
             <div className="text-gray-400 text-xs mt-1">{formatTime(elapsed)}</div>
+          </div>
+        </div>
+      )}
+
+      {/* 카운트다운 오버레이 */}
+      {countdown !== null && (
+        <div className="absolute inset-0 z-[3000] bg-black flex items-center justify-center">
+          <div className="text-white text-9xl font-black" style={{ animation: "kmPop 0.3s ease-out" }}>
+            {countdown}
+          </div>
+        </div>
+      )}
+
+      {/* GPS 미준비 다이얼로그 */}
+      {gpsNotReady && (
+        <div className="absolute inset-0 z-[3000] bg-black/70 flex items-center justify-center px-6">
+          <div className="bg-[#1a2a3a] rounded-2xl p-6 w-full max-w-sm text-center space-y-4">
+            <div className="text-4xl">📡</div>
+            <p className="text-white text-sm font-bold">앗! 아직 GPS가 잡히지 않았습니다</p>
+            <p className="text-gray-400 text-xs">일단 달리실래요?<br/>자동으로 잡히면 이어서 기록됩니다.</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setGpsNotReady(false)}
+                className="flex-1 bg-gray-600 text-white rounded-xl py-3 text-sm font-bold"
+              >
+                기다릴게요
+              </button>
+              <button
+                onClick={() => { setGpsNotReady(false); startTracking(); }}
+                className="flex-1 bg-green-500 text-white rounded-xl py-3 text-sm font-bold"
+              >
+                일단 시작
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -821,7 +883,7 @@ export default function GPSPage() {
         {/* Controls */}
         {status === "idle" && !saved && (
           <button
-            onClick={startTracking}
+            onClick={handleStart}
             disabled={permissionDenied}
             className="w-full bg-green-500 text-white rounded-xl py-4 text-lg font-black active:scale-95 transition-transform disabled:opacity-50"
           >

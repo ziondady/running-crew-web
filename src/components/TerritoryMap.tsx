@@ -216,9 +216,9 @@ export default function TerritoryMap({ territories, cells, myUserId, myCrewId }:
   }, [territories, cells, myUserId, myCrewId, filter]);
 
   return (
-    <div className="relative">
-      <div ref={containerRef} className="w-full rounded-xl overflow-hidden" style={{ height: "55vh", background: "#e8e8e8" }} />
-      <div className="absolute top-3 left-3 z-[1000] flex gap-1">
+    <div className="relative rounded-xl overflow-hidden">
+      <div ref={containerRef} className="w-full" style={{ height: "55vh", background: "#e8e8e8" }} />
+      <div className="absolute top-3 left-3 z-[9999] flex gap-1" style={{ pointerEvents: "auto" }}>
         <button
           onClick={() => setFilter("all")}
           className={`px-3 py-1.5 rounded-full text-[11px] font-bold shadow-md transition-all ${
