@@ -197,8 +197,8 @@ export default function GPSPage() {
           const d = haversine(last.lat, last.lng, lat, lng);
           const timeDelta = (now - last.timestamp) / 1000; // seconds
 
-          // 1. GPS 튐 방지: 시간 대비 비현실적 이동 (300km/h 이상) → skip  [TEMP: raised for car testing]
-          if (timeDelta > 0 && d / timeDelta > 0.0833) return prev;
+          // 1. GPS 튐 방지: 시간 대비 비현실적 이동 (400km/h 이상) → skip  [TEMP: raised for KTX testing]
+          if (timeDelta > 0 && d / timeDelta > 0.1111) return prev;
 
           // 2. 정지 상태 필터: speed < 0.5 m/s AND 이동 < 10m → skip
           const spd = speed ?? null;
