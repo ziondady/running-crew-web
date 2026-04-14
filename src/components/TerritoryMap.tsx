@@ -143,7 +143,36 @@ export default function TerritoryMap({ territories, cells, myUserId, myCrewId }:
 
       rect.addTo(layers);
       allBounds.push([south, west], [north, east]);
+
+      // 셀 라벨 (줌 16+ 에서만 표시)
+      const centerLat = (south + north) / 2;
+      const centerLng = (west + east) / 2;
+      const label = cell.crew_name ? cell.crew_name.charAt(0) : cell.username.charAt(0);
+      const labelMarker = L.marker([centerLat, centerLng], {
+        icon: L.divIcon({
+          className: "",
+          html: `<div style="font-size:8px;font-weight:bold;color:${color};text-align:center;line-height:1;text-shadow:0 0 2px #fff,0 0 2px #fff;">${label}</div>`,
+          iconSize: [16, 12],
+          iconAnchor: [8, 6],
+        }),
+        interactive: false,
+      });
+      labelMarker.addTo(layers);
     });
+
+    // 줌 레벨에 따라 셀 라벨 표시/숨김
+    const map = mapRef.current;
+    const updateLabels = () => {
+      const zoom = map.getZoom();
+      layers.eachLayer((layer: any) => {
+        if (layer instanceof L.Marker && layer.options && !layer.options.interactive) {
+          const el = layer.getElement?.();
+          if (el) el.style.display = zoom >= 16 ? "" : "none";
+        }
+      });
+    };
+    map.on("zoomend", updateLabels);
+    updateLabels();
 
     // Draw territory routes as thin lines on top
     territories.forEach((t) => {
