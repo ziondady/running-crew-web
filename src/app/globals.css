@@ -1,9 +1,5 @@
 @import "tailwindcss";
 
-.territory-grayscale-tile {
-  filter: saturate(0) brightness(0.7);
-}
-
 :root {
   --primary: #FF5722;
   --primary-light: #FF8A65;
