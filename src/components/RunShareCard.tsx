@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useCallback, useEffect } from "react";
+import { Capacitor } from "@capacitor/core";
 
 interface RunShareCardProps {
   distance: number;
@@ -370,8 +371,31 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleBgSelect = () => {
-    fileInputRef.current?.click();
+  // Change 2: Photo picker — use Capacitor Camera when native
+  const handleBgSelect = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { Camera, CameraResultType, CameraSource } = await import("@capacitor/camera");
+        const photo = await Camera.pickImages({
+          quality: 90,
+          limit: 1,
+        });
+        if (photo.photos && photo.photos.length > 0) {
+          const first = photo.photos[0];
+          // Convert path to data URL by reading via fetch
+          const response = await fetch(first.webPath);
+          const blob = await response.blob();
+          const reader = new FileReader();
+          reader.onload = (ev) => setBgImage(ev.target?.result as string);
+          reader.readAsDataURL(blob);
+        }
+      } catch (e) {
+        console.error("Image pick failed:", e);
+      }
+    } else {
+      // Web fallback — existing file input
+      fileInputRef.current?.click();
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -384,29 +408,57 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
     reader.readAsDataURL(file);
   };
 
+  // Change 3: Share/Save — use Capacitor plugins when native
   const handleSave = async () => {
     drawCard();
     await new Promise((r) => setTimeout(r, 100));
     const canvas = canvasRef.current;
     if (!canvas) return;
     setSaving(true);
-    try {
-      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-      if (!blob) return;
 
-      if (navigator.share) {
-        const file = new File([blob], "battlecrew-run.png", { type: "image/png" });
-        await navigator.share({ files: [file] });
+    try {
+      const dataUrl = canvas.toDataURL("image/png");
+
+      if (Capacitor.isNativePlatform()) {
+        // Native: save to filesystem then share
+        const { Filesystem, Directory } = await import("@capacitor/filesystem");
+        const { Share } = await import("@capacitor/share");
+
+        const base64Data = dataUrl.split(",")[1];
+        const filename = `battlecrew-run-${Date.now()}.png`;
+
+        const savedFile = await Filesystem.writeFile({
+          path: filename,
+          data: base64Data,
+          directory: Directory.Cache,
+        });
+
+        await Share.share({
+          title: "배틀크루 러닝",
+          text: "오늘의 러닝 기록!",
+          url: savedFile.uri,
+          dialogTitle: "러닝 기록 공유",
+        });
       } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "battlecrew-run.png";
-        a.click();
-        URL.revokeObjectURL(url);
+        // Web fallback: download or Web Share API
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+        if (!blob) return;
+
+        if (navigator.share && navigator.canShare?.({ files: [new File([blob], "battlecrew-run.png", { type: "image/png" })] })) {
+          const file = new File([blob], "battlecrew-run.png", { type: "image/png" });
+          await navigator.share({ files: [file] });
+        } else {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "battlecrew-run.png";
+          a.click();
+          URL.revokeObjectURL(url);
+        }
       }
-    } catch {
-      // User cancelled share
+    } catch (e) {
+      // Share cancelled or failed — silently ignore
+      console.log("Share failed or cancelled:", e);
     } finally {
       setSaving(false);
     }
@@ -438,17 +490,22 @@ export default function RunShareCard({ distance, elapsed, pace, points, startTim
             {TEMPLATES.map((tmpl, idx) => (
               <button
                 key={tmpl}
+                type="button"
                 onClick={() => handleSelectTemplate(tmpl)}
                 className="flex flex-col items-center gap-2"
+                style={{ touchAction: "manipulation" }}
               >
                 <div className="w-full rounded-xl overflow-hidden border-2 border-transparent hover:border-orange-500 active:border-orange-500">
-                  <canvas
-                    ref={(el) => {
-                      previewRefs.current[idx] = el;
-                    }}
-                    className="w-full"
-                    style={{ display: "block", aspectRatio: "1080/1920" }}
-                  />
+                  {/* Change 1: pointer-events: none so touch passes through canvas to button */}
+                  <div style={{ pointerEvents: "none" }}>
+                    <canvas
+                      ref={(el) => {
+                        previewRefs.current[idx] = el;
+                      }}
+                      className="w-full"
+                      style={{ display: "block", aspectRatio: "1080/1920", pointerEvents: "none" }}
+                    />
+                  </div>
                 </div>
                 <span className="text-white text-sm font-bold">{TEMPLATE_NAMES[tmpl]}</span>
               </button>
