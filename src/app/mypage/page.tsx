@@ -3,9 +3,17 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
-import { getUserProfile, updateNickname, getNotifySettings, updateNotifySettings, API_BASE } from "@/lib/api";
+import { getUserProfile, updateNickname, getNotifySettings, updateNotifySettings, getTerritoryLogs, API_BASE } from "@/lib/api";
 import { getStoredUser, saveUser, clearUser, AuthUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
+
+interface LogItem {
+  id: number;
+  username: string;
+  action: string;
+  durability: number;
+  created_at: string;
+}
 
 export default function MyPage() {
   const router = useRouter();
@@ -28,12 +36,21 @@ export default function MyPage() {
   const [configLoading, setConfigLoading] = useState(false);
   const [configMessage, setConfigMessage] = useState("");
 
+  const [showTerritoryLog, setShowTerritoryLog] = useState(false);
+  const [territoryLogs, setTerritoryLogs] = useState<LogItem[]>([]);
+  const [territoryLogLimit, setTerritoryLogLimit] = useState(10);
+
   useEffect(() => {
     const stored = getStoredUser();
     if (!stored) { router.replace("/"); return; }
 
     getUserProfile(stored.id)
-      .then((data) => { setUser(data); saveUser(data); setLoading(false); })
+      .then((data) => {
+        setUser(data);
+        saveUser(data);
+        setLoading(false);
+        getTerritoryLogs(stored.id).then(setTerritoryLogs).catch(() => {});
+      })
       .catch(() => { setUser(stored); setLoading(false); });
   }, [router]);
 
@@ -119,6 +136,7 @@ export default function MyPage() {
     { icon: "🟢", label: "Strava 연결", tag: "미연결", tagColor: "gray" },
     { icon: "⌚", label: "Garmin 연결", tag: "미연결", tagColor: "gray" },
     { icon: "🔔", label: "알림 설정", action: true, onClick: handleOpenNotifySettings },
+    { icon: "🗺️", label: "점령 활동 알림", action: true, onClick: () => setShowTerritoryLog(!showTerritoryLog) },
     { icon: "🔒", label: "계정 관리", action: true },
   ];
 
@@ -221,6 +239,52 @@ export default function MyPage() {
                 </button>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* 점령 활동 알림 패널 */}
+        {showTerritoryLog && (
+          <div className="bg-white rounded-xl p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-bold">🗺️ 점령 활동 알림</p>
+              <button onClick={() => setShowTerritoryLog(false)} className="text-gray-400 text-sm">닫기</button>
+            </div>
+            {territoryLogs.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-2">활동 이력이 없습니다</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {territoryLogs.slice(0, territoryLogLimit).map((log) => {
+                    const actionLabels: Record<string, { label: string; color: string; border: string }> = {
+                      claim: { label: "🎉 신규 셀 점령!", color: "text-green-600", border: "border-green-500" },
+                      reinforce: { label: "🏰 셀 강화", color: "text-blue-600", border: "border-blue-500" },
+                      takeover: { label: "⚔️ 셀 탈환당함!", color: "text-red-500", border: "border-red-500" },
+                    };
+                    const style = actionLabels[log.action] || actionLabels.claim;
+                    const timeAgo = Math.floor((Date.now() - new Date(log.created_at).getTime()) / 3600000);
+                    return (
+                      <div key={log.id} className={`rounded-lg p-3 border-l-4 ${style.border} bg-gray-50`}>
+                        <div className="flex justify-between items-center">
+                          <span className={`text-xs font-extrabold ${style.color}`}>{style.label}</span>
+                          <span className="text-[10px] text-gray-400">{timeAgo < 1 ? "방금" : `${timeAgo}시간 전`}</span>
+                        </div>
+                        <p className="text-xs text-gray-600 mt-1">
+                          <strong>{log.username}</strong> — Lv.{log.durability}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+                {territoryLogs.length > territoryLogLimit && (
+                  <button
+                    onClick={() => setTerritoryLogLimit((prev) => prev + 10)}
+                    className="w-full mt-3 py-2 text-xs font-bold text-gray-500 bg-gray-100 rounded-lg active:scale-95 transition-transform"
+                  >
+                    더보기
+                  </button>
+                )}
+              </>
+            )}
           </div>
         )}
 

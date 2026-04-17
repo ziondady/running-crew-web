@@ -51,10 +51,8 @@ interface LogItem {
 
 
 export default function TerritoryPage() {
-  const [tab, setTab] = useState<"map" | "detail" | "alert">("map");
   const [territories, setTerritories] = useState<TerritoryItem[]>([]);
   const [cells, setCells] = useState<CellItem[]>([]);
-  const [myTerritories, setMyTerritories] = useState<TerritoryItem[]>([]);
   const [ranking, setRanking] = useState<RankItem[]>([]);
   const [logs, setLogs] = useState<LogItem[]>([]);
   const [me, setMe] = useState<AuthUser | null>(null);
@@ -73,7 +71,6 @@ export default function TerritoryPage() {
     ]).then(([allT, rank, logData, cellData]) => {
       const tList = Array.isArray(allT) ? allT : allT.results ?? [];
       setTerritories(tList);
-      setMyTerritories(tList.filter((t: TerritoryItem) => t.user === stored?.id));
       setRanking(Array.isArray(rank) ? rank : rank.results ?? []);
       setLogs(logData);
       setCells(Array.isArray(cellData) ? cellData : cellData.results ?? []);
@@ -81,7 +78,6 @@ export default function TerritoryPage() {
     });
   }, []);
 
-  const mySegments = myTerritories.length;
   const myRankEntry = ranking.find((r) => r.crew_id === me?.crew);
 
   const now = Date.now();
@@ -96,23 +92,9 @@ export default function TerritoryPage() {
     <AppShell>
       <TopBar title="🗺️ 점령전" settingsButton />
       <div className="p-3">
-        <div className="flex gap-1 mb-3">
-          {([["map", "전체 지도"], ["detail", "점령전 현황"], ["alert", "알림"]] as const).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              className={`flex-1 text-center py-2 rounded-lg text-xs font-bold ${
-                tab === key ? "bg-green-600 text-white" : "bg-gray-200 text-gray-400"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
         {loading && <div className="text-center text-gray-400 text-sm py-8">로딩 중...</div>}
 
-        {!loading && tab === "map" && (
+        {!loading && (
           <>
             {/* Leaflet Map */}
             <TerritoryMap territories={territories} cells={cells} myUserId={me?.id} myCrewId={me?.crew} />
@@ -161,29 +143,9 @@ export default function TerritoryPage() {
                 <div className="text-[10px] text-gray-400">전체 랭킹</div>
               </div>
             </div>
-          </>
-        )}
-
-        {!loading && tab === "detail" && (
-          <>
-            {/* 점령전 현황 헤더 */}
-            <div className="rounded-xl p-4 text-white mb-3" style={{ background: "linear-gradient(135deg, #2E7D32, #4CAF50)" }}>
-              <div className="text-sm font-bold">{me?.crew_name || "내 크루"}</div>
-              <div className="text-xs opacity-80 mt-1">달린 셀이 자동 점령됩니다</div>
-              <div className="grid grid-cols-3 gap-2 mt-3">
-                <div className="text-center">
-                  <div className="text-xl font-extrabold">{cells.filter(c => c.user === me?.id).length}</div>
-                  <div className="text-[9px] opacity-80">내 점령 셀</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xl font-extrabold">{myRankEntry?.rank || "-"}</div>
-                  <div className="text-[9px] opacity-80">전체 크루 순위</div>
-                </div>
-              </div>
-            </div>
 
             {/* 점령 활동 이력 */}
-            <div className="bg-white rounded-xl p-4 shadow-sm mb-3">
+            <div className="bg-white rounded-xl p-4 shadow-sm mt-3">
               <h3 className="text-sm font-bold text-gray-700 mb-1">📋 점령 활동 이력</h3>
               {logs.length === 0 ? (
                 <p className="text-xs text-gray-400 text-center py-2">활동 이력이 없습니다</p>
@@ -218,30 +180,6 @@ export default function TerritoryPage() {
               )}
             </div>
           </>
-        )}
-
-        {!loading && tab === "alert" && (
-          <div className="space-y-2">
-            {logs.length === 0 ? (
-              <div className="text-center text-gray-400 text-sm py-8">알림이 없습니다</div>
-            ) : (
-              logs.map((log) => {
-                const style = actionLabels[log.action] || actionLabels.claim;
-                const timeAgo = Math.floor((now - new Date(log.created_at).getTime()) / 3600000);
-                return (
-                  <div key={log.id} className={`bg-white rounded-xl p-3 shadow-sm border-l-4 ${style.border}`}>
-                    <div className="flex justify-between items-center">
-                      <span className={`text-xs font-extrabold ${style.color}`}>{style.label}</span>
-                      <span className="text-[10px] text-gray-400">{timeAgo < 1 ? "방금" : `${timeAgo}시간 전`}</span>
-                    </div>
-                    <p className="text-xs text-gray-600 mt-1">
-                      <strong>{log.username}</strong> — Lv.{log.durability}
-                    </p>
-                  </div>
-                );
-              })
-            )}
-          </div>
         )}
       </div>
     </AppShell>

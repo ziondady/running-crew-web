@@ -119,8 +119,6 @@ export default function TerritoryMap({ territories, cells, myUserId, myCrewId }:
       }
     });
 
-    const allBounds: [number, number][] = [];
-
     // Draw cells first (underneath)
     filteredCells.forEach((cell) => {
       const { south, west, north, east } = cell.bounds;
@@ -148,7 +146,6 @@ export default function TerritoryMap({ territories, cells, myUserId, myCrewId }:
       `);
 
       rect.addTo(layers);
-      allBounds.push([south, west], [north, east]);
 
       // 셀 라벨 (줌 16+ 에서만 표시)
       const centerLat = (south + north) / 2;
@@ -203,14 +200,8 @@ export default function TerritoryMap({ territories, cells, myUserId, myCrewId }:
       `);
 
       route.addTo(layers);
-      latLngs.forEach(ll => allBounds.push(ll));
     });
 
-    // Fit bounds to show all routes
-    if (allBounds.length > 0) {
-      const bounds = L.latLngBounds(allBounds);
-      mapRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
-    }
   }, [territories, cells, myUserId, myCrewId, filter]);
 
   return (
