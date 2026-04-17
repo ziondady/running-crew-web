@@ -57,8 +57,9 @@ export default function TerritoryMap({ territories, cells, myUserId, myCrewId }:
     const cached = getCachedLocation();
     map.setView(cached ? [cached.lat, cached.lng] : [37.5665, 126.9780], cached ? 15 : 12);
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
+      className: "territory-grayscale-tile",
     }).addTo(map);
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
