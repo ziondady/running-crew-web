@@ -7,7 +7,7 @@ import CrewRanking from "@/components/CrewRanking";
 import { getDailyRanking, getCrewRanking, getUserDailyLogs, getUserMonthlyLogs, deleteRunLog } from "@/lib/api";
 import { getStoredUser, saveUser, AuthUser } from "@/lib/auth";
 import { getUserProfile } from "@/lib/api";
-import { fmtKm } from "@/lib/format";
+import { fmtKm, toLocalDateStr } from "@/lib/format";
 
 type MainTab = "crewRank" | "distance";
 type DistanceSubTab = "daily" | "monthly";
@@ -46,7 +46,7 @@ function RankingContent() {
   const [detailLoading, setDetailLoading] = useState(false);
 
   const today = new Date();
-  const [selectedDate, setSelectedDate] = useState(today.toISOString().slice(0, 10));
+  const [selectedDate, setSelectedDate] = useState(toLocalDateStr(today));
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
 
@@ -225,7 +225,7 @@ function RankingContent() {
                   onClick={() => {
                     const d = new Date(selectedDate);
                     d.setDate(d.getDate() - 1);
-                    const newDate = d.toISOString().slice(0, 10);
+                    const newDate = toLocalDateStr(d);
                     setSelectedDate(newDate);
                     if (me) fetchDistanceRanking("daily", me, newDate);
                   }}
@@ -245,12 +245,12 @@ function RankingContent() {
                     const d = new Date(selectedDate);
                     d.setDate(d.getDate() + 1);
                     if (d <= today) {
-                      const newDate = d.toISOString().slice(0, 10);
+                      const newDate = toLocalDateStr(d);
                       setSelectedDate(newDate);
                       if (me) fetchDistanceRanking("daily", me, newDate);
                     }
                   }}
-                  disabled={selectedDate === today.toISOString().slice(0, 10)}
+                  disabled={selectedDate === toLocalDateStr(today)}
                   className="w-8 h-8 rounded-full bg-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center disabled:opacity-30"
                 >→</button>
               </div>

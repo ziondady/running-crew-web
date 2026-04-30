@@ -6,7 +6,7 @@ import TopBar from "@/components/TopBar";
 import BattleCard from "@/components/BattleCard";
 import { getUserProfile, API_BASE } from "@/lib/api";
 import { getStoredUser, saveUser, AuthUser } from "@/lib/auth";
-import { fmtKm, fmtLocalDate } from "@/lib/format";
+import { fmtKm, fmtLocalDate, toLocalDateStr } from "@/lib/format";
 
 type MainTab = "crewBattle" | "internal";
 
@@ -111,7 +111,7 @@ export default function VersusPage() {
       );
       const data = await res.json();
       const all: PastBattle[] = Array.isArray(data) ? data : data.results ?? [];
-      const now = new Date().toISOString().slice(0, 10);
+      const now = toLocalDateStr(new Date());
       setPastInternalBattles(all.filter((b) => b.end_date < now));
     } catch {}
     setPastInternalLoading(false);

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
 import { getStoredUser, AuthUser } from "@/lib/auth";
+import { toLocalDateStr } from "@/lib/format";
 
 interface Crew {
   id: number;
@@ -47,8 +48,8 @@ export default function OperatorBattleExternal() {
     const today = new Date();
     const nextWeek = new Date(today);
     nextWeek.setDate(today.getDate() + 7);
-    setStartDate(today.toISOString().split("T")[0]);
-    setEndDate(nextWeek.toISOString().split("T")[0]);
+    setStartDate(toLocalDateStr(today));
+    setEndDate(toLocalDateStr(nextWeek));
     setLoading(false);
   }, [router]);
 
