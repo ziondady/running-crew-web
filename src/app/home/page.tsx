@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import BattleCard from "@/components/BattleCard";
-import { getCrewRanking, getUserProfile, getUserMonthlyLogs, API_BASE} from "@/lib/api";
+import { getCrewRanking, getUserProfile, getUserMonthlyLogs, API_BASE, deleteRunLog } from "@/lib/api";
 import { getStoredUser, saveUser, AuthUser } from "@/lib/auth";
 import { fmtKm } from "@/lib/format";
 import { saveLocation } from "@/lib/location";
@@ -103,6 +103,23 @@ export default function HomePage() {
       setDetailLogs([]);
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const handleDeleteLog = async (logId: number, deletedKm: number, ownerUserId: number) => {
+    if (!me) return;
+    if (!confirm("이 기록을 삭제하시겠습니까? (관련 점령 셀은 그대로 유지됩니다)")) return;
+    try {
+      await deleteRunLog(logId, me.id);
+      setDetailLogs((prev) => prev.filter((l: any) => l.id !== logId));
+      setRanking((prev) =>
+        prev
+          .map((r) => r.id === ownerUserId ? { ...r, monthly_km: Math.max(0, r.monthly_km - deletedKm) } : r)
+          .sort((a, b) => b.monthly_km - a.monthly_km)
+          .map((r, idx) => ({ ...r, rank: idx + 1 }))
+      );
+    } catch (e: any) {
+      alert(e.message || "삭제 실패");
     }
   };
 
@@ -238,22 +255,32 @@ export default function HomePage() {
                           <div className="text-[10px] text-gray-400 text-center py-2">기록 없음</div>
                         ) : (
                           <div className="space-y-1">
-                            {detailLogs.map((log: any) => (
-                              <div key={log.id} className="flex items-center gap-2 text-[11px]">
-                                <span className="text-gray-400 shrink-0">{log.date?.slice(5)} {log.created_at}</span>
-                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
-                                  log.source_key === 'manual' ? 'bg-yellow-100 text-yellow-700' :
-                                  log.source_key === 'gps' ? 'bg-green-100 text-green-700' :
-                                  'bg-blue-100 text-blue-700'
-                                }`}>{log.source}</span>
-                                <span className="flex-1 text-gray-500">
-                                  {log.distance !== log.buff_distance
-                                    ? `${fmtKm(log.distance)}km → ${fmtKm(log.buff_distance)}km`
-                                    : `${fmtKm(log.buff_distance)}km`}
-                                </span>
-                                {log.is_offline_meetup && <span className="text-[9px]">🏃오프벙</span>}
-                              </div>
-                            ))}
+                            {detailLogs.map((log: any) => {
+                              const canDelete = !!me && (me.id === m.id || me.role === "operator");
+                              return (
+                                <div key={log.id} className="flex items-center gap-2 text-[11px]">
+                                  <span className="text-gray-400 shrink-0">{log.date?.slice(5)} {log.created_at}</span>
+                                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                    log.source_key === 'manual' ? 'bg-yellow-100 text-yellow-700' :
+                                    log.source_key === 'gps' ? 'bg-green-100 text-green-700' :
+                                    'bg-blue-100 text-blue-700'
+                                  }`}>{log.source}</span>
+                                  <span className="flex-1 text-gray-500">
+                                    {log.distance !== log.buff_distance
+                                      ? `${fmtKm(log.distance)}km → ${fmtKm(log.buff_distance)}km`
+                                      : `${fmtKm(log.buff_distance)}km`}
+                                  </span>
+                                  {log.is_offline_meetup && <span className="text-[9px]">🏃오프벙</span>}
+                                  {canDelete && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleDeleteLog(log.id, log.buff_distance ?? 0, m.id); }}
+                                      className="text-[10px] text-red-400 hover:text-red-600 px-1 active:scale-90 transition-transform"
+                                      aria-label="삭제"
+                                    >🗑️</button>
+                                  )}
+                                </div>
+                              );
+                            })}
                           </div>
                         )}
                       </div>
