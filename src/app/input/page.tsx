@@ -19,6 +19,7 @@ export default function InputPage() {
   const [distance, setDistance] = useState("");
   const [selectedBuffs, setSelectedBuffs] = useState<number[]>([]);
   const [saved, setSaved] = useState(false);
+  const [savedDistance, setSavedDistance] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [buffs, setBuffs] = useState<BuffItem[]>([]);
@@ -71,6 +72,7 @@ export default function InputPage() {
         is_offline_meetup: isOfflineMeetup,
         buffs_applied: selectedBuffs.map((idx) => buffs[idx]?.id).filter(Boolean),
       });
+      setSavedDistance(buffedDistance);
       setSaved(true);
       setDistance("");
       setSelectedBuffs([]);
@@ -226,7 +228,7 @@ export default function InputPage() {
               <span className="text-2xl" style={{ animation: 'confettiFall 2s ease-in-out infinite 0.6s' }}>🎉</span>
             </div>
             <div className="text-2xl font-black text-[var(--primary)]" style={{ animation: 'kmPop 0.6s ease-out' }}>
-              +{fmtKm(buffedDistance)} km
+              +{fmtKm(savedDistance)} km
             </div>
             <div className="text-xs text-gray-400 mt-1">오늘도 힘차게 달렸어요!</div>
           </div>
