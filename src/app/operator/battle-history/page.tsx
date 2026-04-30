@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
 import { getStoredUser, AuthUser } from "@/lib/auth";
+import { fmtLocalDate } from "@/lib/format";
 
 interface Battle {
   id: number;
@@ -132,7 +133,7 @@ export default function BattleHistoryPage() {
 
                   {/* Period */}
                   <div className="text-[10px] text-gray-400 text-center">
-                    {b.start_date?.slice(0, 10)} ~ {b.end_date?.slice(0, 10)}
+                    {fmtLocalDate(b.start_date)} ~ {fmtLocalDate(b.end_date)}
                   </div>
 
                   {/* Actions */}

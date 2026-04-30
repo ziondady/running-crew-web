@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import TopBar from "@/components/TopBar";
 import { getStoredUser, AuthUser } from "@/lib/auth";
+import { fmtLocalDate } from "@/lib/format";
 
 interface Member {
   id: number;
@@ -175,7 +176,7 @@ function OperatorTeams() {
             >
               {battles.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.crew_a_name || `대결 #${b.id}`} — {b.start_date?.slice(0, 10)} ~ {b.end_date?.slice(0, 10)}
+                  {b.crew_a_name || `대결 #${b.id}`} — {fmtLocalDate(b.start_date)} ~ {fmtLocalDate(b.end_date)}
                 </option>
               ))}
             </select>

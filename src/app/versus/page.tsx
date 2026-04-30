@@ -6,7 +6,7 @@ import TopBar from "@/components/TopBar";
 import BattleCard from "@/components/BattleCard";
 import { getUserProfile, API_BASE } from "@/lib/api";
 import { getStoredUser, saveUser, AuthUser } from "@/lib/auth";
-import { fmtKm } from "@/lib/format";
+import { fmtKm, fmtLocalDate } from "@/lib/format";
 
 type MainTab = "crewBattle" | "internal";
 
@@ -250,7 +250,7 @@ export default function VersusPage() {
                     </div>
                     <div className="flex-1">
                       <div className="text-sm font-semibold">{h.crew_a_name} vs {h.crew_b_name}</div>
-                      <div className="text-[10px] text-gray-400">{h.start_date} ~ {h.end_date}</div>
+                      <div className="text-[10px] text-gray-400">{fmtLocalDate(h.start_date)} ~ {fmtLocalDate(h.end_date)}</div>
                       {(h.crew_a_km !== undefined && h.crew_b_km !== undefined) && (
                         <div className="text-[11px] font-bold text-gray-500 mt-0.5">
                           {h.crew_a_km}km vs {h.crew_b_km}km
@@ -358,7 +358,7 @@ export default function VersusPage() {
                           </div>
                           <div className="flex-1">
                             <div className="text-sm font-semibold">{b.name}</div>
-                            <div className="text-[10px] text-gray-400">{b.start_date} ~ {b.end_date}</div>
+                            <div className="text-[10px] text-gray-400">{fmtLocalDate(b.start_date)} ~ {fmtLocalDate(b.end_date)}</div>
                           </div>
                           {b.crew_a_km != null && b.crew_b_km != null && (
                             <div className="text-xs font-bold text-gray-500">

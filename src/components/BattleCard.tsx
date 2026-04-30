@@ -1,5 +1,5 @@
 "use client";
-import { fmtKm } from "@/lib/format";
+import { fmtKm, fmtLocalDate } from "@/lib/format";
 
 interface BattleCardProps {
   battleName?: string;
@@ -151,7 +151,7 @@ export default function BattleCard({
             : '동점'
         }
       </p>
-      <p className="text-[9px] text-gray-300 text-center mt-0.5">{startDate} ~ {endDate}</p>
+      <p className="text-[9px] text-gray-300 text-center mt-0.5">{fmtLocalDate(startDate)} ~ {fmtLocalDate(endDate)}</p>
     </div>
   );
 }
