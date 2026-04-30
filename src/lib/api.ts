@@ -131,6 +131,16 @@ export async function getUserMonthlyLogs(userId: number, year: number, month: nu
   return fetchAPI(`/running/logs/user-daily-logs/?user_id=${userId}&year=${year}&month=${month}`);
 }
 
+export async function deleteRunLog(logId: number, requesterId: number) {
+  const res = await fetch(`${API_BASE}/running/logs/${logId}/?requester_id=${requesterId}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error || `삭제 실패 (${res.status})`);
+  }
+}
+
 // Territory
 export async function getTerritories(userId?: number) {
   const query = userId ? `?user=${userId}` : '?all=true';
