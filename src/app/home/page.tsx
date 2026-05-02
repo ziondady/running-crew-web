@@ -14,6 +14,7 @@ interface RankMember {
   monthly_km: number;
   rank: number;
   territory_count?: number;
+  team?: { team_side: string; team_label: string; battle_name: string };
 }
 
 interface ActiveBattle {
@@ -63,7 +64,7 @@ export default function HomePage() {
         if (data.crew) {
           return getCrewRanking(data.crew).then((r) => {
             const list = r.ranking || (Array.isArray(r) ? r : []);
-            setRanking(list.map((m: any) => ({ id: m.id, username: m.username, monthly_km: m.monthly_km, rank: m.rank, territory_count: m.territory_count || 0 })));
+            setRanking(list.map((m: any) => ({ id: m.id, username: m.username, monthly_km: m.monthly_km, rank: m.rank, territory_count: m.territory_count || 0, team: m.team })));
             setLoading(false);
           });
         }
@@ -238,6 +239,13 @@ export default function HomePage() {
                       <span className="font-extrabold text-[var(--primary)] w-5">
                         {medal || m.rank}
                       </span>
+                      {m.team && (
+                        <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${
+                          m.team.team_side === "A" ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-600"
+                        }`}>
+                          {m.team.team_label}
+                        </span>
+                      )}
                       <span className={`flex-1 font-semibold ${isMe ? "text-[var(--primary)]" : ""}`}>
                         {isMe ? `나 (${m.username})` : m.username}
                         <span className="text-[9px] text-gray-400 ml-1">🗺️{m.territory_count || 0}</span>
