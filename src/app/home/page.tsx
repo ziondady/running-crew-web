@@ -17,6 +17,16 @@ interface RankMember {
   team?: { team_side: string; team_label: string; battle_name: string };
 }
 
+interface WeekResult {
+  week_num: number;
+  start: string;
+  end: string;
+  team_a_km: number;
+  team_b_km: number;
+  winner_side: "A" | "B" | null;
+  is_current?: boolean;
+}
+
 interface ActiveBattle {
   battle_id: number;
   battle_name: string;
@@ -31,6 +41,13 @@ interface ActiveBattle {
   end_date: string;
   crew_a_name: string | null;
   crew_b_name: string | null;
+  // 내부 팀전 추가 필드
+  team_a_wins?: number;
+  team_b_wins?: number;
+  weeks?: WeekResult[];
+  current_week_num?: number | null;
+  current_week_team_a_km?: number;
+  current_week_team_b_km?: number;
 }
 
 export default function HomePage() {
@@ -187,6 +204,12 @@ export default function HomePage() {
               startDate={b.start_date}
               endDate={b.end_date}
               isMyTeamA={isTeamA}
+              teamAWins={b.team_a_wins}
+              teamBWins={b.team_b_wins}
+              weeks={b.weeks}
+              currentWeekNum={b.current_week_num}
+              currentWeekTeamAKm={b.current_week_team_a_km}
+              currentWeekTeamBKm={b.current_week_team_b_km}
             />
           );
         })}

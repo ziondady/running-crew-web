@@ -10,6 +10,16 @@ import { fmtKm, fmtLocalDate, toLocalDateStr } from "@/lib/format";
 
 type MainTab = "crewBattle" | "internal";
 
+interface WeekResult {
+  week_num: number;
+  start: string;
+  end: string;
+  team_a_km: number;
+  team_b_km: number;
+  winner_side: "A" | "B" | null;
+  is_current?: boolean;
+}
+
 interface ActiveBattle {
   battle_id: number;
   battle_name: string;
@@ -24,6 +34,12 @@ interface ActiveBattle {
   end_date: string;
   crew_a_name: string | null;
   crew_b_name: string | null;
+  team_a_wins?: number;
+  team_b_wins?: number;
+  weeks?: WeekResult[];
+  current_week_num?: number | null;
+  current_week_team_a_km?: number;
+  current_week_team_b_km?: number;
 }
 
 interface TeamDetail {
@@ -303,6 +319,12 @@ export default function VersusPage() {
                           startDate={b.start_date}
                           endDate={b.end_date}
                           isMyTeamA={isTeamA}
+                          teamAWins={b.team_a_wins}
+                          teamBWins={b.team_b_wins}
+                          weeks={b.weeks}
+                          currentWeekNum={b.current_week_num}
+                          currentWeekTeamAKm={b.current_week_team_a_km}
+                          currentWeekTeamBKm={b.current_week_team_b_km}
                         />
                         {detail && (
                           <div className="grid grid-cols-2 gap-2 mt-2">

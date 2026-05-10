@@ -101,6 +101,14 @@ export default function OperatorBattleInternal() {
       setSubmitError("종료일은 시작일보다 이후여야 합니다.");
       return;
     }
+    // 7일 단위 검증 (주차별 승점 시스템)
+    const startMs = new Date(startDate + "T00:00:00").getTime();
+    const endMs = new Date(endDate + "T00:00:00").getTime();
+    const days = Math.round((endMs - startMs) / 86400000) + 1; // 양 끝 포함
+    if (days % 7 !== 0) {
+      setSubmitError(`기간이 7일 단위여야 합니다. 현재 ${days}일 (예: 7, 14, 21, 28일).`);
+      return;
+    }
 
     let finalTeamA = teamA;
     let finalTeamB = teamB;
@@ -260,6 +268,7 @@ export default function OperatorBattleInternal() {
             {/* Duration */}
             <div className="bg-white rounded-xl p-5 shadow-sm space-y-3">
               <div className="text-sm font-bold text-blue-700">대결 기간</div>
+              <p className="text-[10px] text-gray-400">주차별 승점 시스템 — 기간은 <strong>7일 단위</strong>로 설정해야 합니다 (예: 7/14/21/28일)</p>
               <div>
                 <label className="text-xs text-gray-500 font-semibold">시작일</label>
                 <input
@@ -278,6 +287,18 @@ export default function OperatorBattleInternal() {
                   className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
               </div>
+              {startDate && endDate && (() => {
+                const ms = new Date(endDate + "T00:00:00").getTime() - new Date(startDate + "T00:00:00").getTime();
+                const days = Math.round(ms / 86400000) + 1;
+                const isValid = days > 0 && days % 7 === 0;
+                return (
+                  <div className={`text-[11px] font-bold ${isValid ? "text-green-600" : "text-red-500"}`}>
+                    {isValid
+                      ? `✅ ${days}일 (${days / 7}주차)`
+                      : `⚠️ ${days}일 — 7일 단위 아님 (가장 가까운: ${Math.floor(days / 7) * 7 || 7}일 또는 ${Math.ceil(days / 7) * 7}일)`}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Team assignment mode */}
