@@ -67,12 +67,17 @@ interface CrewBattleHistory {
   battle_id: number;
   battle_name: string;
   battle_type: string;
+  team_a_label: string;
+  team_b_label: string;
   crew_a_name: string | null;
   crew_b_name: string | null;
   crew_a_km?: number;
   crew_b_km?: number;
+  team_a_wins: number;
+  team_b_wins: number;
+  winner_team_side: "A" | "B" | null;
   winner_name: string | null;
-  result: "win" | "loss" | "draw";
+  result: "win" | "loss" | "draw" | "internal";
   start_date: string;
   end_date: string;
 }
@@ -255,29 +260,59 @@ export default function VersusPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {crewBattleHistory.map((h) => (
-                  <div key={h.battle_id} className="bg-white rounded-xl px-4 py-3 shadow-sm flex items-center gap-3">
-                    <div className={`text-xs font-extrabold px-2 py-1 rounded-lg flex-shrink-0 ${
-                      h.result === "win" ? "bg-blue-100 text-blue-700"
-                      : h.result === "loss" ? "bg-red-100 text-red-500"
-                      : "bg-gray-100 text-gray-500"
-                    }`}>
-                      {h.result === "win" ? "승" : h.result === "loss" ? "패" : "무"}
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-sm font-semibold">{h.crew_a_name} vs {h.crew_b_name}</div>
-                      <div className="text-[10px] text-gray-400">{fmtLocalDate(h.start_date)} ~ {fmtLocalDate(h.end_date)}</div>
-                      {(h.crew_a_km !== undefined && h.crew_b_km !== undefined) && (
-                        <div className="text-[11px] font-bold text-gray-500 mt-0.5">
-                          {h.crew_a_km}km vs {h.crew_b_km}km
+                {crewBattleHistory.map((h) => {
+                  const isInternal = h.battle_type === "internal";
+                  const aLabel = h.team_a_label || h.crew_a_name || "A팀";
+                  const bLabel = h.team_b_label || h.crew_b_name || "B팀";
+
+                  let badgeText = "무";
+                  let badgeCls = "bg-gray-100 text-gray-500";
+                  if (isInternal) {
+                    if (h.winner_team_side === "A") {
+                      badgeText = aLabel + " 승";
+                      badgeCls = "bg-blue-100 text-blue-700";
+                    } else if (h.winner_team_side === "B") {
+                      badgeText = bLabel + " 승";
+                      badgeCls = "bg-orange-100 text-orange-600";
+                    } else {
+                      badgeText = "무";
+                    }
+                  } else {
+                    if (h.result === "win") { badgeText = "승"; badgeCls = "bg-blue-100 text-blue-700"; }
+                    else if (h.result === "loss") { badgeText = "패"; badgeCls = "bg-red-100 text-red-500"; }
+                  }
+
+                  return (
+                    <div key={h.battle_id} className="bg-white rounded-xl px-4 py-3 shadow-sm flex items-center gap-3">
+                      <div className={`text-xs font-extrabold px-2 py-1 rounded-lg flex-shrink-0 ${badgeCls}`}>
+                        {badgeText}
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-sm font-semibold">
+                          {isInternal ? (aLabel + " vs " + bLabel) : (h.crew_a_name + " vs " + h.crew_b_name)}
                         </div>
+                        <div className="text-[10px] text-gray-400">{fmtLocalDate(h.start_date)} ~ {fmtLocalDate(h.end_date)}</div>
+                        {isInternal ? (
+                          <div className="text-[11px] font-bold text-gray-600 mt-0.5">
+                            주차 승점 {h.team_a_wins} : {h.team_b_wins}
+                            {(h.crew_a_km !== undefined && h.crew_b_km !== undefined) && (
+                              <span className="ml-2 font-normal text-gray-400">({h.crew_a_km}km vs {h.crew_b_km}km)</span>
+                            )}
+                          </div>
+                        ) : (
+                          (h.crew_a_km !== undefined && h.crew_b_km !== undefined) && (
+                            <div className="text-[11px] font-bold text-gray-500 mt-0.5">
+                              {h.crew_a_km}km vs {h.crew_b_km}km
+                            </div>
+                          )
+                        )}
+                      </div>
+                      {!isInternal && h.winner_name && (
+                        <div className="text-[10px] font-bold text-green-600">{h.winner_name} 승</div>
                       )}
                     </div>
-                    {h.winner_name && (
-                      <div className="text-[10px] font-bold text-green-600">{h.winner_name} 승</div>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
