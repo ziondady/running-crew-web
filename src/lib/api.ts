@@ -1,8 +1,14 @@
+import { clearUser } from './auth';
+
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 async function fetchAPI(path: string) {
   const res = await fetch(`${API_BASE}${path}`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(`API error: ${res.status}`) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
   return res.json();
 }
 
@@ -42,7 +48,18 @@ export async function login(data: { username: string; password: string }) {
 }
 
 export async function getUserProfile(userId: number) {
-  return fetchAPI(`/accounts/profile/${userId}/`);
+  try {
+    return await fetchAPI(`/accounts/profile/${userId}/`);
+  } catch (e) {
+    // 저장된 계정이 서버에 없으면(계정 삭제, DB 초기화 등) 캐시된 신원을 폐기한다.
+    // 인증이 없어 localStorage 의 id 가 곧 신원이므로, 남겨두면 재사용된 id 로
+    // 다른 사람 계정에 접근하게 된다. 네트워크 오류나 5xx 는 로그아웃시키지 않는다.
+    if ((e as { status?: number })?.status === 404 && typeof window !== 'undefined') {
+      clearUser();
+      window.location.replace('/');
+    }
+    throw e;
+  }
 }
 
 export async function getNotifySettings(userId: number) {
