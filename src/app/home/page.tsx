@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
+import ApkDownloadButton from "@/components/ApkDownloadButton";
 import BattleCard from "@/components/BattleCard";
 import { getCrewRanking, getUserProfile, getUserMonthlyLogs, API_BASE, deleteRunLog } from "@/lib/api";
 import { getStoredUser, saveUser, AuthUser } from "@/lib/auth";
@@ -150,6 +151,7 @@ export default function HomePage() {
       {/* Top bar */}
       <div className="w-full bg-[var(--dark)] text-white px-4 py-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] text-sm font-bold flex items-center gap-2">
         <span className="flex-1">⚔️ 배틀크루</span>
+        <ApkDownloadButton />
         <button onClick={() => router.push("/mypage")} className="opacity-80 text-lg">⚙️</button>
       </div>
 
