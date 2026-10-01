@@ -106,6 +106,31 @@ export async function joinCrew(crewId: number) {
   return postAPI(`/crews/crews/${crewId}/join/`, {});
 }
 
+// 가입 신청용 공개 크루 검색 (비공개 크루는 나오지 않는다)
+export interface DiscoverCrew {
+  id: number;
+  name: string;
+  description: string;
+  area: string;
+  member_count: number;
+}
+
+export async function discoverCrews(q: string, userId: number): Promise<DiscoverCrew[]> {
+  return fetchAPI(`/crews/crews/discover/?q=${encodeURIComponent(q)}&user_id=${userId}`);
+}
+
+// 공개 크루에 가입 신청 - 신청 즉시 가입된다
+export async function applyToCrew(crewId: number, userId: number): Promise<{ crew: string; crew_id: number }> {
+  const res = await fetch(`${API_BASE}/crews/crews/${crewId}/apply/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: userId }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || '가입 신청에 실패했습니다.');
+  return body;
+}
+
 // Crews
 export async function getCrews() {
   const data = await fetchAPI('/crews/crews/');

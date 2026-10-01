@@ -18,6 +18,7 @@ interface MemberStat {
 interface CrewStats {
   crew_id: number;
   crew_name: string;
+  is_public: boolean;
   member_count: number;
   total_km_this_month: number;
   active_battles: number;
@@ -38,6 +39,7 @@ export default function OperatorDashboard() {
   const [editingName, setEditingName] = useState(false);
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [savingPublic, setSavingPublic] = useState(false);
 
   useEffect(() => {
     const stored = getStoredUser();
@@ -54,6 +56,26 @@ export default function OperatorDashboard() {
   }, [router]);
 
   if (!user) return null;
+
+  // 공개 크루는 크루 찾기에서 검색되고, 신청하면 바로 가입된다. 비공개는 QR 초대로만 가입한다.
+  const handleTogglePublic = async () => {
+    if (!user?.crew || !stats || savingPublic) return;
+    const next = !stats.is_public;
+    setSavingPublic(true);
+    try {
+      const res = await fetch(`${API_BASE}/crews/crews/${user.crew}/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_public: next }),
+      });
+      if (!res.ok) throw new Error();
+      setStats((prev) => prev ? { ...prev, is_public: next } : prev);
+    } catch {
+      alert('공개 설정 변경에 실패했습니다. 다시 시도해주세요.');
+    } finally {
+      setSavingPublic(false);
+    }
+  };
 
   const handleSaveName = async () => {
     if (!user?.crew || !newName.trim()) return;
@@ -152,6 +174,31 @@ export default function OperatorDashboard() {
                   </button>
                 </div>
               )}
+              <div className="flex items-center justify-between gap-3 mt-3 bg-white/10 rounded-lg px-3 py-2">
+                <div className="min-w-0">
+                  <div className="text-xs font-bold">
+                    {stats.is_public ? '🔓 공개 크루' : '🔒 비공개 크루'}
+                  </div>
+                  <div className="text-[10px] opacity-70 leading-snug">
+                    {stats.is_public
+                      ? '크루 찾기에 노출되고, 신청하면 바로 가입돼요'
+                      : 'QR 초대로만 가입할 수 있어요'}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={stats.is_public}
+                  aria-label="크루 공개 여부"
+                  onClick={handleTogglePublic}
+                  disabled={savingPublic}
+                  className={`relative shrink-0 w-11 h-6 rounded-full transition-colors disabled:opacity-50 ${stats.is_public ? 'bg-emerald-400' : 'bg-white/30'}`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${stats.is_public ? 'translate-x-5' : ''}`}
+                  />
+                </button>
+              </div>
               <div className="flex gap-4 mt-3">
                 <div className="text-center">
                   <div className="text-xl font-extrabold">{stats.member_count}</div>
