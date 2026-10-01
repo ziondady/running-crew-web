@@ -234,6 +234,12 @@ export default function HomePage() {
                 📷 QR 가입
               </button>
             </div>
+            <button
+              onClick={() => router.push("/crew-search")}
+              className="w-full bg-gray-100 text-gray-600 rounded-lg py-2.5 text-sm font-bold active:scale-95 transition-transform"
+            >
+              🔍 크루 검색해서 가입
+            </button>
           </div>
         )}
 
